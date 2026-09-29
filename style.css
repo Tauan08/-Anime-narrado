@@ -1,0 +1,67 @@
+body {
+    background-color: #121214;
+    color: #e1e1e6;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    margin: 0;
+}
+
+.container {
+    background-color: #202024;
+    padding: 30px;
+    border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+    max-width: 800px;
+    width: 100%;
+    text-align: center;
+}
+
+h1 { color: #00adb5; margin-bottom: 5px; }
+.subtitle { color: #87868b; margin-bottom: 25px; }
+
+.upload-section {
+    display: flex;
+    justify-content: space-between;
+    gap: 20px;
+    margin-bottom: 20px;
+}
+
+.file-input {
+    flex: 1;
+    background: #29292e;
+    padding: 15px;
+    border-radius: 6px;
+    border: 1px dashed #4d4d57;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.file-input label { margin-bottom: 10px; font-weight: bold; }
+input[type="file"] { width: 100%; }
+
+.controls-section {
+    background: #29292e;
+    padding: 15px;
+    border-radius: 6px;
+    margin-bottom: 20px;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-around;
+    align-items: center;
+}
+
+select, input[type="range"] {
+    background: #121214;
+    color: #fff;
+    border: 1px solid #4d4d57;
+    padding: 8px;
+    border-radius: 4px;
+}
+
+.player-container { margin-top: 20px; background: #000; border-radius: 6px; overflow: hidden; }
+video { width: 100%; display: block; max-height: 450px; }
+
