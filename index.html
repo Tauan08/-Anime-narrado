@@ -1,46 +1,81 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Anime Dubber AI</title>
-    <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Anime Dubber AI</title>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="container">
-        <h1>Anime Dubber Platform 🎧</h1>
-        <p class="subtitle">Anexe o vídeo do anime e a legenda para gerar a narração em tempo real</p>
+  <div class="container">
+    <h1>Anime Dubber Platform 🎧</h1>
+    <p class="subtitle">Anexe o vídeo do anime e a legenda para gerar a narração em tempo real</p>
 
-        <div class="upload-section">
-            <div class="file-input">
-                <label for="videoFile">🎬 Selecionar Vídeo (MP4):</label>
-                <input type="file" id="videoFile" accept="video/mp4, video/webm">
-            </div>
-            
-            <div class="file-input">
-                <label for="srtFile">📝 Selecionar Legenda (.SRT ou .VTT):</label>
-                <input type="file" id="srtFile" accept=".srt,.vtt">
-            </div>
-        </div>
-
-        <div class="controls-section">
-            <label for="voiceSelect">🗣️ Escolha a Voz:</label>
-            <select id="voiceSelect"><option value="">Carregando vozes...</option></select>
-
-            <div class="sliders">
-                <label>Velocidade: <span id="rateVal">1.2</span>x</label>
-                <input type="range" id="rate" min="0.5" max="2" value="1.2" step="0.1">
-            </div>
-        </div>
-
-        <div class="player-container">
-            <video id="videoPlayer" controls>
-                Seu navegador não suporta a reprodução de vídeos.
-            </video>
-        </div>
+    <div class="upload-section">
+      <div class="file-input">
+        <label for="videoFile">🎬 Selecionar Vídeo (MP4):</label>
+        <input type="file" id="videoFile" accept="video/mp4,video/webm,video/*">
+      </div>
+      <div class="file-input">
+        <label for="srtFile">📝 Selecionar Legenda (.SRT ou .VTT):</label>
+        <input type="file" id="srtFile" accept=".srt,.vtt,text/vtt">
+      </div>
     </div>
 
-    <script href="script.js" src="script.js"></script>
+    <p id="status" class="status">Nenhuma legenda carregada.</p>
+
+    <!-- VOZ -->
+    <div class="controls-section">
+      <div class="control">
+        <label for="voiceSelect">🗣️ Escolha a Voz:</label>
+        <select id="voiceSelect"><option value="">Carregando vozes...</option></select>
+      </div>
+      <button id="testVoice" type="button" class="btn">🔊 Testar voz</button>
+    </div>
+
+    <!-- VOLUMES -->
+    <div class="controls-section">
+      <div class="control">
+        <label>🔉 Volume do vídeo (anime): <span id="videoVolVal">100</span>%</label>
+        <input type="range" id="videoVolume" min="0" max="100" step="1" value="100">
+      </div>
+
+      <div class="control">
+        <label>🗣️ Volume da voz narrativa: <span id="voiceVolVal">100</span>%</label>
+        <input type="range" id="voiceVolume" min="0" max="100" step="1" value="100">
+      </div>
+
+      <div class="control">
+        <label>⏩ Velocidade da voz: <span id="rateVal">1.2</span>x</label>
+        <input type="range" id="rate" min="0.5" max="2" step="0.1" value="1.2">
+      </div>
+    </div>
+
+    <!-- DUCKING -->
+    <div class="controls-section">
+      <label class="check">
+        <input type="checkbox" id="ducking" checked>
+        Abaixar o vídeo automaticamente quando a voz falar
+      </label>
+
+      <div class="control">
+        <label>Nível do vídeo durante a fala: <span id="duckVal">25</span>%</label>
+        <input type="range" id="duckLevel" min="0" max="100" step="1" value="25">
+      </div>
+    </div>
+
+    <div class="player-container">
+      <video id="videoPlayer" controls playsinline webkit-playsinline preload="metadata">
+        Seu navegador não suporta a reprodução de vídeos.
+      </video>
+    </div>
+
+    <p class="hint">
+      ⚠️ No celular o volume do sistema controla o volume geral.
+      Use os controles acima para abaixar <strong>só o vídeo</strong> e manter a voz alta.
+    </p>
+  </div>
+
+  <script src="script.js"></script>
 </body>
 </html>
-
