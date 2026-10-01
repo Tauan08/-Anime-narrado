@@ -1,5 +1,6 @@
 /* =========================================================
    Anime Dubber Platform — com persistência (IndexedDB + localStorage)
+   + botões de limpeza (vídeo, legenda, tudo) e modal próprio
    ========================================================= */
 
 const videoPlayer   = document.getElementById('videoPlayer');
@@ -17,7 +18,17 @@ const duckLevel     = document.getElementById('duckLevel');
 const duckVal       = document.getElementById('duckVal');
 const statusEl      = document.getElementById('status');
 const testVoiceBtn  = document.getElementById('testVoice');
+
+const clearVideoBtn = document.getElementById('clearVideoBtn');
+const clearSrtBtn   = document.getElementById('clearSrtBtn');
 const clearDataBtn  = document.getElementById('clearData');
+
+/* Modal de confirmação próprio */
+const confirmOverlay = document.getElementById('confirmOverlay');
+const confirmTitle   = document.getElementById('confirmTitle');
+const confirmMessage = document.getElementById('confirmMessage');
+const confirmCancel  = document.getElementById('confirmCancel');
+const confirmOk      = document.getElementById('confirmOk');
 
 let subtitles = [];
 let lastSubtitleIndex = -1;
@@ -26,8 +37,7 @@ let voices = [];
 let currentUtterance = null;
 let pendingVoiceURI = '';
 
-/* ---------- Web Audio API (controla o volume do vídeo sem depender da
-   propriedade `volume`, que no iOS é somente leitura) ---------- */
+/* ---------- Web Audio API ---------- */
 let audioCtx = null;
 let videoSource = null;
 let videoGain = null;
@@ -83,6 +93,16 @@ async function idbGet(key) {
   });
 }
 
+async function idbDelete(key) {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE, 'readwrite');
+    tx.objectStore(STORE).delete(key);
+    tx.oncomplete = () => { db.close(); resolve(); };
+    tx.onerror    = () => { db.close(); reject(tx.error); };
+  });
+}
+
 async function idbClear() {
   const db = await openDB();
   return new Promise((resolve, reject) => {
@@ -122,7 +142,36 @@ function persistState() {
 }
 
 /* =========================================================
-   2) ÁUDIO — inicialização e controle de ganho
+   2) MODAL DE CONFIRMAÇÃO PRÓPRIO
+   ========================================================= */
+function askConfirm(title, message, okLabel = 'Sim, apagar') {
+  return new Promise((resolve) => {
+    confirmTitle.textContent   = title;
+    confirmMessage.textContent = message;
+    confirmOk.textContent      = okLabel;
+    confirmOverlay.hidden      = false;
+
+    const cleanup = () => {
+      confirmOverlay.hidden = true;
+      confirmOk.removeEventListener('click', onOk);
+      confirmCancel.removeEventListener('click', onCancel);
+      confirmOverlay.removeEventListener('click', onOverlay);
+    };
+
+    const onOk      = () => { cleanup(); resolve(true);  };
+    const onCancel  = () => { cleanup(); resolve(false); };
+    const onOverlay = (e) => {
+      if (e.target === confirmOverlay) { cleanup(); resolve(false); }
+    };
+
+    confirmOk.addEventListener('click', onOk);
+    confirmCancel.addEventListener('click', onCancel);
+    confirmOverlay.addEventListener('click', onOverlay);
+  });
+}
+
+/* =========================================================
+   3) ÁUDIO — inicialização e controle de ganho
    ========================================================= */
 function initAudioContext() {
   if (audioInitialized) return;
@@ -146,7 +195,6 @@ function resumeAudioContext() {
   }
 }
 
-/* Aplica o volume do vídeo no ganho (ou no elemento, como fallback) */
 function setVideoGain(value01) {
   if (videoGain) {
     videoGain.gain.value = value01;
@@ -156,7 +204,7 @@ function setVideoGain(value01) {
 }
 
 /* =========================================================
-   3) VOZES
+   4) VOZES
    ========================================================= */
 function loadVoices() {
   voices = synth.getVoices();
@@ -164,7 +212,6 @@ function loadVoices() {
 
   voiceSelect.innerHTML = '';
 
-  // Português primeiro, depois o resto (mas todas disponíveis)
   const sorted = [...voices].sort((a, b) => {
     const ap = a.lang.toLowerCase().startsWith('pt') ? 0 : 1;
     const bp = b.lang.toLowerCase().startsWith('pt') ? 0 : 1;
@@ -179,7 +226,6 @@ function loadVoices() {
     voiceSelect.appendChild(option);
   });
 
-  // Restaura a voz salva
   if (pendingVoiceURI) {
     const idx = voices.findIndex(v => v.voiceURI === pendingVoiceURI);
     if (idx !== -1) voiceSelect.value = String(idx);
@@ -192,25 +238,16 @@ if (speechSynthesis.onvoiceschanged !== undefined) {
 }
 
 /* =========================================================
-   4) APLICAÇÃO DO ESTADO SALVO (controles)
+   5) APLICAÇÃO DO ESTADO SALVO
    ========================================================= */
 const savedState = readSavedState();
 
-if (savedState.rate) {
-  rateInput.value = savedState.rate;
-}
-if (savedState.videoVolume !== undefined) {
-  videoVolume.value = savedState.videoVolume;
-}
-if (savedState.voiceVolume !== undefined) {
-  voiceVolume.value = savedState.voiceVolume;
-}
-if (savedState.duckLevel !== undefined) {
-  duckLevel.value = savedState.duckLevel;
-}
-if (savedState.ducking !== undefined) {
-  duckingCheck.checked = !!savedState.ducking;
-}
+if (savedState.rate)                    rateInput.value    = savedState.rate;
+if (savedState.videoVolume !== undefined) videoVolume.value = savedState.videoVolume;
+if (savedState.voiceVolume !== undefined) voiceVolume.value = savedState.voiceVolume;
+if (savedState.duckLevel   !== undefined) duckLevel.value   = savedState.duckLevel;
+if (savedState.ducking     !== undefined) duckingCheck.checked = !!savedState.ducking;
+
 videoName = savedState.videoName || '';
 srtName   = savedState.srtName   || '';
 pendingVoiceURI = savedState.voiceURI || '';
@@ -221,12 +258,11 @@ voiceVolVal.textContent = voiceVolume.value;
 duckVal.textContent     = duckLevel.value;
 
 loadVoices();
-// Alguns navegadores carregam as vozes depois
 setTimeout(loadVoices, 300);
 setTimeout(loadVoices, 1200);
 
 /* =========================================================
-   5) CONTROLES — listeners
+   6) CONTROLES — listeners
    ========================================================= */
 rateInput.addEventListener('input', () => {
   rateVal.textContent = rateInput.value;
@@ -253,7 +289,7 @@ duckingCheck.addEventListener('change', persistState);
 voiceSelect.addEventListener('change', persistState);
 
 /* =========================================================
-   6) CARREGAR VÍDEO (e salvar no IndexedDB)
+   7) CARREGAR VÍDEO
    ========================================================= */
 videoFile.addEventListener('change', async (e) => {
   const file = e.target.files[0];
@@ -287,7 +323,7 @@ videoFile.addEventListener('change', async (e) => {
 });
 
 /* =========================================================
-   7) CARREGAR LEGENDA (e salvar no IndexedDB)
+   8) CARREGAR LEGENDA
    ========================================================= */
 srtFile.addEventListener('change', (e) => {
   const file = e.target.files[0];
@@ -315,7 +351,7 @@ srtFile.addEventListener('change', (e) => {
 });
 
 /* =========================================================
-   8) PARSER DE LEGENDAS (SRT + VTT)
+   9) PARSER DE LEGENDAS (SRT + VTT)
    ========================================================= */
 function parseSubtitles(data) {
   let text = String(data)
@@ -361,7 +397,7 @@ function parseSubtitles(data) {
 }
 
 /* =========================================================
-   9) SINCRONIZAÇÃO + SALVAMENTO PERIÓDICO DA POSIÇÃO
+   10) SINCRONIZAÇÃO + SALVAMENTO PERIÓDICO
    ========================================================= */
 let lastPersistAt = 0;
 
@@ -382,7 +418,6 @@ videoPlayer.addEventListener('timeupdate', () => {
     setVideoGain(videoVolume.value / 100);
   }
 
-  // Salva a posição a cada ~3 segundos
   if (Date.now() - lastPersistAt > 3000) {
     lastPersistAt = Date.now();
     persistState();
@@ -390,7 +425,7 @@ videoPlayer.addEventListener('timeupdate', () => {
 });
 
 /* =========================================================
-   10) NARRAÇÃO
+   11) NARRAÇÃO
    ========================================================= */
 function narrarTexto(texto) {
   if (!texto || texto.trim() === '') return;
@@ -425,7 +460,7 @@ function narrarTexto(texto) {
 }
 
 /* =========================================================
-   11) TESTAR VOZ
+   12) TESTAR VOZ
    ========================================================= */
 testVoiceBtn.addEventListener('click', () => {
   resumeAudioContext();
@@ -442,12 +477,55 @@ testVoiceBtn.addEventListener('click', () => {
 });
 
 /* =========================================================
-   12) LIMPAR DADOS SALVOS
+   13) LIMPEZA — só vídeo, só legenda, tudo
    ========================================================= */
-clearDataBtn.addEventListener('click', async () => {
-  if (!confirm('Isso vai apagar o vídeo, a legenda e as preferências salvas neste aparelho. Continuar?')) {
-    return;
+clearVideoBtn.addEventListener('click', async () => {
+  const ok = await askConfirm(
+    'Limpar vídeo?',
+    'O vídeo salvo será removido deste aparelho. As legendas e preferências continuam.',
+    'Sim, limpar vídeo'
+  );
+  if (!ok) return;
+
+  try { await idbDelete('video'); } catch (e) { console.warn(e); }
+
+  if (videoObjectURL) {
+    URL.revokeObjectURL(videoObjectURL);
+    videoObjectURL = null;
   }
+
+  videoPlayer.removeAttribute('src');
+  videoPlayer.load();
+
+  videoName = '';
+  persistState();
+  statusEl.textContent = '🎬 Vídeo removido.';
+});
+
+clearSrtBtn.addEventListener('click', async () => {
+  const ok = await askConfirm(
+    'Limpar legenda?',
+    'A legenda salva será removida deste aparelho. O vídeo e as preferências continuam.',
+    'Sim, limpar legenda'
+  );
+  if (!ok) return;
+
+  try { await idbDelete('srt'); } catch (e) { console.warn(e); }
+
+  subtitles = [];
+  lastSubtitleIndex = -1;
+  srtName = '';
+  persistState();
+  statusEl.textContent = '📝 Legenda removida.';
+});
+
+clearDataBtn.addEventListener('click', async () => {
+  const ok = await askConfirm(
+    'Limpar TUDO?',
+    'Isso apaga vídeo, legenda, posição e todas as preferências salvas neste aparelho. Não tem como desfazer.',
+    'Sim, apagar tudo'
+  );
+  if (!ok) return;
 
   localStorage.removeItem(LS_KEY);
   try { await idbClear(); } catch (e) { console.warn(e); }
@@ -465,15 +543,15 @@ clearDataBtn.addEventListener('click', async () => {
   videoPlayer.removeAttribute('src');
   videoPlayer.load();
 
-  statusEl.textContent = '🗑️ Dados salvos apagados.';
+  statusEl.textContent = '🗑️ Todos os dados salvos foram apagados.';
 });
 
 /* =========================================================
-   13) RESTAURAÇÃO DOS ARQUIVOS AO ABRIR A PÁGINA
+   14) RESTAURAÇÃO AO ABRIR A PÁGINA
    ========================================================= */
 async function restoreFiles() {
   let videoBlob = null;
-  let srtBlob = null;
+  let srtBlob   = null;
 
   try {
     videoBlob = await idbGet('video');
@@ -530,7 +608,7 @@ async function restoreFiles() {
 }
 
 /* =========================================================
-   14) INICIALIZAÇÃO DE ÁUDIO EM INTERAÇÕES DO USUÁRIO
+   15) INICIALIZAÇÃO DE ÁUDIO / SALVAMENTO FINAL
    ========================================================= */
 document.body.addEventListener('click', () => {
   initAudioContext();
@@ -547,7 +625,6 @@ videoPlayer.addEventListener('play', () => {
 videoPlayer.addEventListener('pause', persistState);
 videoPlayer.addEventListener('ended', persistState);
 
-/* Salva quando o app vai para segundo plano (trocar pro WhatsApp etc.) */
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') persistState();
 });
@@ -555,6 +632,6 @@ window.addEventListener('pagehide', persistState);
 window.addEventListener('beforeunload', persistState);
 
 /* =========================================================
-   15) START
+   16) START
    ========================================================= */
 restoreFiles();
