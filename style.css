@@ -109,20 +109,34 @@ select {
   border-radius: 6px;
   font-weight: bold;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: background 0.2s, transform 0.1s;
+  font-size: 0.95rem;
 }
 
-.btn:hover {
-  background: #00cfd9;
-}
+.btn:hover   { background: #00cfd9; }
+.btn:active  { transform: scale(0.97); }
 
 .btn-secondary {
   background: #3a3a42;
   color: #e1e1e6;
 }
+.btn-secondary:hover { background: #4d4d57; }
 
-.btn-secondary:hover {
-  background: #4d4d57;
+.btn-warn {
+  background: #b9821a;
+  color: #121214;
+}
+.btn-warn:hover { background: #d99a24; }
+
+.btn-danger {
+  background: #c0392b;
+  color: #fff;
+}
+.btn-danger:hover { background: #e04b3b; }
+
+.actions-section {
+  background: #1c1c20;
+  border: 1px solid #3a3a42;
 }
 
 .player-container {
@@ -143,4 +157,50 @@ video {
   color: #87868b;
   margin-top: 15px;
   line-height: 1.4;
+}
+
+/* ===== MODAL ===== */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+.modal-overlay[hidden] { display: none; }
+
+.modal-box {
+  background: #202024;
+  border: 1px solid #3a3a42;
+  border-radius: 10px;
+  padding: 24px;
+  max-width: 420px;
+  width: 100%;
+  text-align: center;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.6);
+}
+
+.modal-box h2 {
+  margin: 0 0 10px;
+  color: #00adb5;
+  font-size: 1.15rem;
+}
+
+.modal-box p {
+  margin: 0 0 20px;
+  color: #c4c4cc;
+  font-size: 0.95rem;
+  line-height: 1.4;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
 }
