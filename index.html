@@ -31,7 +31,6 @@
         <select id="voiceSelect"><option value="">Carregando vozes...</option></select>
       </div>
       <button id="testVoice" type="button" class="btn">🔊 Testar voz</button>
-      <button id="clearData" type="button" class="btn btn-secondary">🗑️ Limpar dados salvos</button>
     </div>
 
     <!-- VOLUMES -->
@@ -71,11 +70,30 @@
       </video>
     </div>
 
+    <!-- AÇÕES / LIMPEZA -->
+    <div class="controls-section actions-section">
+      <button id="clearVideoBtn" type="button" class="btn btn-warn">🎬 Limpar só o vídeo</button>
+      <button id="clearSrtBtn"   type="button" class="btn btn-warn">📝 Limpar só a legenda</button>
+      <button id="clearData"     type="button" class="btn btn-danger">🗑️ Limpar TUDO</button>
+    </div>
+
     <p class="hint">
       ⚠️ No celular o volume do sistema controla o volume geral.
       Use os controles acima para abaixar <strong>só o vídeo</strong> e manter a voz alta.<br>
       💾 Vídeo, legenda, posição e preferências são salvos automaticamente neste aparelho.
     </p>
+  </div>
+
+  <!-- ===== MODAL DE CONFIRMAÇÃO (funciona em qualquer celular) ===== -->
+  <div id="confirmOverlay" class="modal-overlay" hidden>
+    <div class="modal-box">
+      <h2 id="confirmTitle">Confirmar</h2>
+      <p id="confirmMessage">Tem certeza?</p>
+      <div class="modal-actions">
+        <button id="confirmCancel" type="button" class="btn btn-secondary">Cancelar</button>
+        <button id="confirmOk"     type="button" class="btn btn-danger">Sim, apagar</button>
+      </div>
+    </div>
   </div>
 
   <script src="script.js"></script>
