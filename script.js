@@ -3,6 +3,7 @@
    + botões de limpeza (vídeo, legenda, tudo)
    + modal próprio de confirmação
    + editor de SRT em tempo real (sincronia manual)
+   + correção: re-narração ao fazer seek e ao aplicar edições
    ========================================================= */
 
 const videoPlayer   = document.getElementById('videoPlayer');
@@ -244,11 +245,11 @@ if (speechSynthesis.onvoiceschanged !== undefined) {
    ========================================================= */
 const savedState = readSavedState();
 
-if (savedState.rate)                      rateInput.value    = savedState.rate;
-if (savedState.videoVolume !== undefined) videoVolume.value  = savedState.videoVolume;
-if (savedState.voiceVolume !== undefined) voiceVolume.value  = savedState.voiceVolume;
-if (savedState.duckLevel   !== undefined) duckLevel.value    = savedState.duckLevel;
-if (savedState.ducking     !== undefined) duckingCheck.checked = !!savedState.ducking;
+if (savedState.rate)                       rateInput.value    = savedState.rate;
+if (savedState.videoVolume !== undefined)  videoVolume.value  = savedState.videoVolume;
+if (savedState.voiceVolume !== undefined)  voiceVolume.value  = savedState.voiceVolume;
+if (savedState.duckLevel   !== undefined)  duckLevel.value    = savedState.duckLevel;
+if (savedState.ducking     !== undefined)  duckingCheck.checked = !!savedState.ducking;
 
 videoName = savedState.videoName || '';
 srtName   = savedState.srtName   || '';
@@ -445,8 +446,13 @@ videoPlayer.addEventListener('timeupdate', () => {
   updateSrtHighlight();
 });
 
-videoPlayer.addEventListener('seeked', () => updateSrtHighlight());
-videoPlayer.addEventListener('play',   () => updateSrtHighlight());
+/* <- NOVO: ao buscar/adiantar/voltar, força re-narrar */
+videoPlayer.addEventListener('seeked', () => {
+  lastSubtitleIndex = -1;
+  updateSrtHighlight();
+});
+
+videoPlayer.addEventListener('play', () => updateSrtHighlight());
 
 /* =========================================================
    11) NARRAÇÃO
@@ -971,6 +977,7 @@ function applySrtThis(i) {
   pushSrtHistory();
   subtitles[i].startTime = Math.max(0, buf.startTime);
   subtitles[i].endTime   = Math.max(subtitles[i].startTime + 0.1, buf.endTime);
+  lastSubtitleIndex = -1;   // <- NOVO: força re-narrar após edição
   closeSrtInlineEditor();
   scheduleSaveSubtitles();
 }
@@ -992,6 +999,7 @@ function applySrtForward(i) {
       s.endTime   = s.startTime + dur;
     }
   }
+  lastSubtitleIndex = -1;   // <- NOVO: força re-narrar após edição
   closeSrtInlineEditor();
   scheduleSaveSubtitles();
 }
@@ -1013,6 +1021,7 @@ function applySrtAll(i) {
       s.endTime   = s.startTime + dur;
     }
   }
+  lastSubtitleIndex = -1;   // <- NOVO: força re-narrar após edição
   closeSrtInlineEditor();
   scheduleSaveSubtitles();
 }
@@ -1028,6 +1037,7 @@ function applySrtGlobalShift() {
   }
   srtEditorState.editingIndex = -1;
   srtEditorState.editingBuffer = null;
+  lastSubtitleIndex = -1;   // <- NOVO: força re-narrar após edição
   renderSrtEditor();
   scheduleSaveSubtitles();
 }
