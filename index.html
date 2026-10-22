@@ -70,6 +70,37 @@
       </video>
     </div>
 
+    <!-- ============ EDITOR DE LEGENDAS EM TEMPO REAL ============ -->
+    <div class="srt-editor-panel" id="srtEditorPanel" hidden>
+      <button id="toggleSrtEditor" type="button" class="srt-toggle">
+        <span class="srt-toggle-icon" id="srtToggleIcon">▶</span>
+        <span>📝 Editar Legendas em Tempo Real</span>
+        <span class="srt-editor-info" id="srtEditorInfo"></span>
+      </button>
+
+      <div id="srtEditorBody" class="srt-editor-body" hidden>
+        <div class="srt-editor-toolbar">
+          <input type="text" id="srtSearch" class="srt-search" placeholder="🔍 Buscar legenda ou tempo...">
+
+          <div class="srt-global-shift">
+            <span>Deslocar todos:</span>
+            <input type="number" id="srtGlobalShift" class="srt-shift-input" value="0" step="0.1">
+            <span>s</span>
+            <button type="button" id="srtApplyGlobalShift" class="btn btn-small">Aplicar</button>
+          </div>
+
+          <button type="button" id="srtFollowPlayback" class="btn btn-small">🎯 Ir para atual</button>
+          <button type="button" id="srtUndo" class="btn btn-small" disabled>↶ Desfazer</button>
+          <button type="button" id="srtRevertAll" class="btn btn-small" disabled>↺ Reverter tudo</button>
+          <button type="button" id="srtExport" class="btn btn-small btn-success">💾 Baixar SRT</button>
+        </div>
+
+        <div class="srt-list" id="srtList">
+          <div class="srt-empty">Carregue um arquivo .SRT para editar as legendas.</div>
+        </div>
+      </div>
+    </div>
+
     <!-- AÇÕES / LIMPEZA -->
     <div class="controls-section actions-section">
       <button id="clearVideoBtn" type="button" class="btn btn-warn">🎬 Limpar só o vídeo</button>
@@ -84,7 +115,7 @@
     </p>
   </div>
 
-  <!-- ===== MODAL DE CONFIRMAÇÃO (funciona em qualquer celular) ===== -->
+  <!-- ===== MODAL DE CONFIRMAÇÃO ===== -->
   <div id="confirmOverlay" class="modal-overlay" hidden>
     <div class="modal-box">
       <h2 id="confirmTitle">Confirmar</h2>
