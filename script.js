@@ -4,6 +4,8 @@
    + modal próprio de confirmação
    + editor de SRT em tempo real (sincronia manual)
    + correção: re-narração ao fazer seek e ao aplicar edições
+   + correção: "Este e os seguintes" agora trata fim estendido
+   + NOVO: "Encadear seguintes" (elimina gaps, cola os subs)
    ========================================================= */
 
 const videoPlayer   = document.getElementById('videoPlayer');
@@ -26,7 +28,6 @@ const clearVideoBtn = document.getElementById('clearVideoBtn');
 const clearSrtBtn   = document.getElementById('clearSrtBtn');
 const clearDataBtn  = document.getElementById('clearData');
 
-/* Modal de confirmação próprio */
 const confirmOverlay = document.getElementById('confirmOverlay');
 const confirmTitle   = document.getElementById('confirmTitle');
 const confirmMessage = document.getElementById('confirmMessage');
@@ -40,15 +41,11 @@ let voices = [];
 let currentUtterance = null;
 let pendingVoiceURI = '';
 
-/* ---------- Web Audio API ---------- */
 let audioCtx = null;
 let videoSource = null;
 let videoGain = null;
 let audioInitialized = false;
 
-/* =========================================================
-   1) PERSISTÊNCIA — chaves e helpers
-   ========================================================= */
 const LS_KEY     = 'animeDubber.state.v1';
 const DB_NAME    = 'animeDubberDB';
 const DB_VERSION = 1;
@@ -60,22 +57,16 @@ let videoObjectURL = null;
 
 function openDB() {
   return new Promise((resolve, reject) => {
-    if (!('indexedDB' in window)) {
-      reject(new Error('IndexedDB indisponível neste navegador'));
-      return;
-    }
+    if (!('indexedDB' in window)) { reject(new Error('IndexedDB indisponível')); return; }
     const req = indexedDB.open(DB_NAME, DB_VERSION);
     req.onupgradeneeded = () => {
       const db = req.result;
-      if (!db.objectStoreNames.contains(STORE)) {
-        db.createObjectStore(STORE);
-      }
+      if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE);
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror   = () => reject(req.error);
   });
 }
-
 async function idbPut(key, value) {
   const db = await openDB();
   return new Promise((resolve, reject) => {
@@ -85,7 +76,6 @@ async function idbPut(key, value) {
     tx.onerror    = () => { db.close(); reject(tx.error); };
   });
 }
-
 async function idbGet(key) {
   const db = await openDB();
   return new Promise((resolve, reject) => {
@@ -95,7 +85,6 @@ async function idbGet(key) {
     req.onerror   = () => { db.close(); reject(req.error); };
   });
 }
-
 async function idbDelete(key) {
   const db = await openDB();
   return new Promise((resolve, reject) => {
@@ -105,7 +94,6 @@ async function idbDelete(key) {
     tx.onerror    = () => { db.close(); reject(tx.error); };
   });
 }
-
 async function idbClear() {
   const db = await openDB();
   return new Promise((resolve, reject) => {
@@ -116,15 +104,10 @@ async function idbClear() {
   });
 }
 
-/* ---------- Estado no localStorage ---------- */
 function readSavedState() {
-  try {
-    return JSON.parse(localStorage.getItem(LS_KEY)) || {};
-  } catch (e) {
-    return {};
-  }
+  try { return JSON.parse(localStorage.getItem(LS_KEY)) || {}; }
+  catch (e) { return {}; }
 }
-
 function persistState() {
   try {
     const state = {
@@ -139,43 +122,32 @@ function persistState() {
       time:         videoPlayer.currentTime || 0
     };
     localStorage.setItem(LS_KEY, JSON.stringify(state));
-  } catch (e) {
-    console.warn('Não foi possível salvar o estado:', e);
-  }
+  } catch (e) { console.warn('Não foi possível salvar o estado:', e); }
 }
 
-/* =========================================================
-   2) MODAL DE CONFIRMAÇÃO PRÓPRIO
-   ========================================================= */
 function askConfirm(title, message, okLabel = 'Sim, apagar') {
   return new Promise((resolve) => {
     confirmTitle.textContent   = title;
     confirmMessage.textContent = message;
     confirmOk.textContent      = okLabel;
     confirmOverlay.hidden      = false;
-
     const cleanup = () => {
       confirmOverlay.hidden = true;
       confirmOk.removeEventListener('click', onOk);
       confirmCancel.removeEventListener('click', onCancel);
       confirmOverlay.removeEventListener('click', onOverlay);
     };
-
     const onOk      = () => { cleanup(); resolve(true);  };
     const onCancel  = () => { cleanup(); resolve(false); };
     const onOverlay = (e) => {
       if (e.target === confirmOverlay) { cleanup(); resolve(false); }
     };
-
     confirmOk.addEventListener('click', onOk);
     confirmCancel.addEventListener('click', onCancel);
     confirmOverlay.addEventListener('click', onOverlay);
   });
 }
 
-/* =========================================================
-   3) ÁUDIO — inicialização e controle de ganho
-   ========================================================= */
 function initAudioContext() {
   if (audioInitialized) return;
   try {
@@ -191,36 +163,23 @@ function initAudioContext() {
     audioInitialized = false;
   }
 }
-
 function resumeAudioContext() {
-  if (audioCtx && audioCtx.state === 'suspended') {
-    audioCtx.resume();
-  }
+  if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
 }
-
 function setVideoGain(value01) {
-  if (videoGain) {
-    videoGain.gain.value = value01;
-  } else {
-    try { videoPlayer.volume = value01; } catch (e) { /* iOS: read-only */ }
-  }
+  if (videoGain) videoGain.gain.value = value01;
+  else { try { videoPlayer.volume = value01; } catch (e) {} }
 }
 
-/* =========================================================
-   4) VOZES
-   ========================================================= */
 function loadVoices() {
   voices = synth.getVoices();
   if (!voices.length) return;
-
   voiceSelect.innerHTML = '';
-
   const sorted = [...voices].sort((a, b) => {
     const ap = a.lang.toLowerCase().startsWith('pt') ? 0 : 1;
     const bp = b.lang.toLowerCase().startsWith('pt') ? 0 : 1;
     return ap - bp;
   });
-
   sorted.forEach((voice) => {
     const realIndex = voices.indexOf(voice);
     const option = document.createElement('option');
@@ -228,93 +187,65 @@ function loadVoices() {
     option.textContent = `${voice.name} (${voice.lang})`;
     voiceSelect.appendChild(option);
   });
-
   if (pendingVoiceURI) {
     const idx = voices.findIndex(v => v.voiceURI === pendingVoiceURI);
     if (idx !== -1) voiceSelect.value = String(idx);
     pendingVoiceURI = '';
   }
 }
-
 if (speechSynthesis.onvoiceschanged !== undefined) {
   speechSynthesis.onvoiceschanged = loadVoices;
 }
 
-/* =========================================================
-   5) APLICAÇÃO DO ESTADO SALVO
-   ========================================================= */
 const savedState = readSavedState();
-
-if (savedState.rate)                       rateInput.value    = savedState.rate;
-if (savedState.videoVolume !== undefined)  videoVolume.value  = savedState.videoVolume;
-if (savedState.voiceVolume !== undefined)  voiceVolume.value  = savedState.voiceVolume;
-if (savedState.duckLevel   !== undefined)  duckLevel.value    = savedState.duckLevel;
-if (savedState.ducking     !== undefined)  duckingCheck.checked = !!savedState.ducking;
-
+if (savedState.rate)                      rateInput.value    = savedState.rate;
+if (savedState.videoVolume !== undefined) videoVolume.value  = savedState.videoVolume;
+if (savedState.voiceVolume !== undefined) voiceVolume.value  = savedState.voiceVolume;
+if (savedState.duckLevel   !== undefined) duckLevel.value    = savedState.duckLevel;
+if (savedState.ducking     !== undefined) duckingCheck.checked = !!savedState.ducking;
 videoName = savedState.videoName || '';
 srtName   = savedState.srtName   || '';
 pendingVoiceURI = savedState.voiceURI || '';
-
 rateVal.textContent     = rateInput.value;
 videoVolVal.textContent = videoVolume.value;
 voiceVolVal.textContent = voiceVolume.value;
 duckVal.textContent     = duckLevel.value;
-
 loadVoices();
 setTimeout(loadVoices, 300);
 setTimeout(loadVoices, 1200);
 
-/* =========================================================
-   6) CONTROLES — listeners
-   ========================================================= */
 rateInput.addEventListener('input', () => {
   rateVal.textContent = rateInput.value;
   persistState();
 });
-
 videoVolume.addEventListener('input', () => {
   videoVolVal.textContent = videoVolume.value;
   setVideoGain(videoVolume.value / 100);
   persistState();
 });
-
 voiceVolume.addEventListener('input', () => {
   voiceVolVal.textContent = voiceVolume.value;
   persistState();
 });
-
 duckLevel.addEventListener('input', () => {
   duckVal.textContent = duckLevel.value;
   persistState();
 });
-
 duckingCheck.addEventListener('change', persistState);
 voiceSelect.addEventListener('change', persistState);
 
-/* =========================================================
-   7) CARREGAR VÍDEO
-   ========================================================= */
 videoFile.addEventListener('change', async (e) => {
   const file = e.target.files[0];
   if (!file) return;
-
   initAudioContext();
   resumeAudioContext();
-
   videoName = file.name;
-
-  if (videoObjectURL) {
-    URL.revokeObjectURL(videoObjectURL);
-    videoObjectURL = null;
-  }
-
+  if (videoObjectURL) { URL.revokeObjectURL(videoObjectURL); videoObjectURL = null; }
   videoObjectURL = URL.createObjectURL(file);
   videoPlayer.src = videoObjectURL;
   videoPlayer.load();
-
   setVideoGain(videoVolume.value / 100);
   persistState();
-
   statusEl.textContent = '💾 Salvando vídeo...';
   try {
     await idbPut('video', file);
@@ -325,24 +256,17 @@ videoFile.addEventListener('change', async (e) => {
   }
 });
 
-/* =========================================================
-   8) CARREGAR LEGENDA
-   ========================================================= */
 srtFile.addEventListener('change', (e) => {
   const file = e.target.files[0];
   if (!file) return;
-
   srtName = file.name;
   const reader = new FileReader();
-
   reader.onload = async function (evt) {
     const text = evt.target.result;
     subtitles = parseSubtitles(text);
     lastSubtitleIndex = -1;
     statusEl.textContent = `✅ ${subtitles.length} linhas de legenda carregadas.`;
     persistState();
-
-    /* --- reset do editor + mostrar painel --- */
     srtEditorState.history = [];
     srtEditorState.editingIndex = -1;
     srtEditorState.editingBuffer = null;
@@ -351,7 +275,6 @@ srtFile.addEventListener('change', (e) => {
     lastHighlightedSubIndex = -1;
     showSrtEditorPanel();
     renderSrtEditor();
-
     try {
       await idbPut('srt', file);
       await idbPut('subtitles', subtitles);
@@ -360,194 +283,121 @@ srtFile.addEventListener('change', (e) => {
       statusEl.textContent += ' (⚠️ legenda não pôde ser salva)';
     }
   };
-
   reader.readAsText(file);
 });
 
-/* =========================================================
-   9) PARSER DE LEGENDAS (SRT + VTT)
-   ========================================================= */
 function parseSubtitles(data) {
   let text = String(data)
     .replace(/^\uFEFF/, '')
     .replace(/\r\n/g, '\n')
     .replace(/\r/g, '\n');
-
   const blocks = text.split(/\n{2,}/);
   const timeRe = /(\d{1,2}):(\d{2}):(\d{2})[.,](\d{1,3})\s*-->\s*(\d{1,2}):(\d{2}):(\d{2})[.,](\d{1,3})/;
   const subs = [];
-
   for (const block of blocks) {
     const lines = block.split('\n').filter(l => l.trim() !== '');
     if (!lines.length) continue;
-
     const timeLineIdx = lines.findIndex(l => timeRe.test(l));
     if (timeLineIdx === -1) continue;
-
     const m = lines[timeLineIdx].match(timeRe);
     const start =
-      parseInt(m[1], 10) * 3600 +
-      parseInt(m[2], 10) * 60 +
-      parseInt(m[3], 10) +
+      parseInt(m[1], 10) * 3600 + parseInt(m[2], 10) * 60 + parseInt(m[3], 10) +
       parseInt(m[4].padEnd(3, '0'), 10) / 1000;
-
     const end =
-      parseInt(m[5], 10) * 3600 +
-      parseInt(m[6], 10) * 60 +
-      parseInt(m[7], 10) +
+      parseInt(m[5], 10) * 3600 + parseInt(m[6], 10) * 60 + parseInt(m[7], 10) +
       parseInt(m[8].padEnd(3, '0'), 10) / 1000;
-
     const txt = lines.slice(timeLineIdx + 1)
       .join(' ')
       .replace(/<[^>]*>/g, '')
       .replace(/\{[^}]*\}/g, '')
       .trim();
-
     if (txt) subs.push({
-      startTime: start,
-      endTime: end,
-      text: txt,
-      origStartTime: start,
-      origEndTime: end
+      startTime: start, endTime: end, text: txt,
+      origStartTime: start, origEndTime: end
     });
   }
-
   subs.sort((a, b) => a.startTime - b.startTime);
   return subs;
 }
 
-/* =========================================================
-   10) SINCRONIZAÇÃO + SALVAMENTO PERIÓDICO
-   ========================================================= */
 let lastPersistAt = 0;
-
 videoPlayer.addEventListener('timeupdate', () => {
   if (videoPlayer.paused) return;
-
   const currentTime = videoPlayer.currentTime;
   const activeSubIndex = subtitles.findIndex(
     sub => currentTime >= sub.startTime && currentTime <= sub.endTime
   );
-
   if (activeSubIndex !== -1 && activeSubIndex !== lastSubtitleIndex) {
     lastSubtitleIndex = activeSubIndex;
     narrarTexto(subtitles[activeSubIndex].text);
   }
-
   if (activeSubIndex === -1 && duckingCheck.checked) {
     setVideoGain(videoVolume.value / 100);
   }
-
   if (Date.now() - lastPersistAt > 3000) {
     lastPersistAt = Date.now();
     persistState();
   }
-
   updateSrtHighlight();
 });
 
-/* <- NOVO: ao buscar/adiantar/voltar, força re-narrar */
 videoPlayer.addEventListener('seeked', () => {
   lastSubtitleIndex = -1;
   updateSrtHighlight();
 });
-
 videoPlayer.addEventListener('play', () => updateSrtHighlight());
 
-/* =========================================================
-   11) NARRAÇÃO
-   ========================================================= */
 function narrarTexto(texto) {
   if (!texto || texto.trim() === '') return;
-
   synth.cancel();
-
-  if (duckingCheck.checked) {
-    setVideoGain(duckLevel.value / 100);
-  }
-
+  if (duckingCheck.checked) setVideoGain(duckLevel.value / 100);
   const utterance = new SpeechSynthesisUtterance(texto);
   const selectedVoiceIndex = voiceSelect.value;
-  if (voices[selectedVoiceIndex]) {
-    utterance.voice = voices[selectedVoiceIndex];
-  }
-
+  if (voices[selectedVoiceIndex]) utterance.voice = voices[selectedVoiceIndex];
   utterance.rate   = parseFloat(rateInput.value);
   utterance.volume = voiceVolume.value / 100;
-
   const restore = () => {
-    if (duckingCheck.checked) {
-      setVideoGain(videoVolume.value / 100);
-    }
+    if (duckingCheck.checked) setVideoGain(videoVolume.value / 100);
     currentUtterance = null;
   };
-
   utterance.onend   = restore;
   utterance.onerror = restore;
-
   currentUtterance = utterance;
   synth.speak(utterance);
 }
 
-/* =========================================================
-   12) TESTAR VOZ
-   ========================================================= */
 testVoiceBtn.addEventListener('click', () => {
   resumeAudioContext();
   const texto = 'Esta é uma amostra da voz narrativa.';
   const utterance = new SpeechSynthesisUtterance(texto);
   const selectedVoiceIndex = voiceSelect.value;
-  if (voices[selectedVoiceIndex]) {
-    utterance.voice = voices[selectedVoiceIndex];
-  }
+  if (voices[selectedVoiceIndex]) utterance.voice = voices[selectedVoiceIndex];
   utterance.rate   = parseFloat(rateInput.value);
   utterance.volume = voiceVolume.value / 100;
   synth.cancel();
   synth.speak(utterance);
 });
 
-/* =========================================================
-   13) LIMPEZA — só vídeo, só legenda, tudo
-   ========================================================= */
 clearVideoBtn.addEventListener('click', async () => {
-  const ok = await askConfirm(
-    'Limpar vídeo?',
-    'O vídeo salvo será removido deste aparelho. As legendas e preferências continuam.',
-    'Sim, limpar vídeo'
-  );
+  const ok = await askConfirm('Limpar vídeo?', 'O vídeo salvo será removido deste aparelho. As legendas e preferências continuam.', 'Sim, limpar vídeo');
   if (!ok) return;
-
   try { await idbDelete('video'); } catch (e) { console.warn(e); }
-
-  if (videoObjectURL) {
-    URL.revokeObjectURL(videoObjectURL);
-    videoObjectURL = null;
-  }
-
+  if (videoObjectURL) { URL.revokeObjectURL(videoObjectURL); videoObjectURL = null; }
   videoPlayer.removeAttribute('src');
   videoPlayer.load();
-
   videoName = '';
   persistState();
   statusEl.textContent = '🎬 Vídeo removido.';
 });
 
 clearSrtBtn.addEventListener('click', async () => {
-  const ok = await askConfirm(
-    'Limpar legenda?',
-    'A legenda salva será removida deste aparelho. O vídeo e as preferências continuam.',
-    'Sim, limpar legenda'
-  );
+  const ok = await askConfirm('Limpar legenda?', 'A legenda salva será removida deste aparelho. O vídeo e as preferências continuam.', 'Sim, limpar legenda');
   if (!ok) return;
-
   try { await idbDelete('srt'); }       catch (e) { console.warn(e); }
   try { await idbDelete('subtitles'); } catch (e) { console.warn(e); }
-
   subtitles = [];
   lastSubtitleIndex = -1;
   srtName = '';
-
-  /* reset do editor */
   hideSrtEditorPanel();
   srtEditorState.history = [];
   srtEditorState.editingIndex = -1;
@@ -555,36 +405,22 @@ clearSrtBtn.addEventListener('click', async () => {
   srtEditorState.filter = '';
   srtSearch.value = '';
   lastHighlightedSubIndex = -1;
-
   persistState();
   statusEl.textContent = '📝 Legenda removida.';
 });
 
 clearDataBtn.addEventListener('click', async () => {
-  const ok = await askConfirm(
-    'Limpar TUDO?',
-    'Isso apaga vídeo, legenda, posição e todas as preferências salvas neste aparelho. Não tem como desfazer.',
-    'Sim, apagar tudo'
-  );
+  const ok = await askConfirm('Limpar TUDO?', 'Isso apaga vídeo, legenda, posição e todas as preferências salvas neste aparelho. Não tem como desfazer.', 'Sim, apagar tudo');
   if (!ok) return;
-
   localStorage.removeItem(LS_KEY);
   try { await idbClear(); } catch (e) { console.warn(e); }
-
-  if (videoObjectURL) {
-    URL.revokeObjectURL(videoObjectURL);
-    videoObjectURL = null;
-  }
-
+  if (videoObjectURL) { URL.revokeObjectURL(videoObjectURL); videoObjectURL = null; }
   subtitles = [];
   lastSubtitleIndex = -1;
   videoName = '';
   srtName = '';
-
   videoPlayer.removeAttribute('src');
   videoPlayer.load();
-
-  /* reset do editor */
   hideSrtEditorPanel();
   srtEditorState.history = [];
   srtEditorState.editingIndex = -1;
@@ -592,18 +428,11 @@ clearDataBtn.addEventListener('click', async () => {
   srtEditorState.filter = '';
   srtSearch.value = '';
   lastHighlightedSubIndex = -1;
-
   statusEl.textContent = '🗑️ Todos os dados salvos foram apagados.';
 });
 
-/* =========================================================
-   14) RESTAURAÇÃO AO ABRIR A PÁGINA
-   ========================================================= */
 async function restoreFiles() {
-  let videoBlob = null;
-  let srtBlob   = null;
-  let savedSubs = null;
-
+  let videoBlob = null, srtBlob = null, savedSubs = null;
   try {
     videoBlob = await idbGet('video');
     srtBlob   = await idbGet('srt');
@@ -612,15 +441,11 @@ async function restoreFiles() {
     console.warn('Falha ao ler do IndexedDB:', e);
     return;
   }
-
   const hasSavedSubs = Array.isArray(savedSubs) && savedSubs.length > 0;
-
   if (!videoBlob && !srtBlob && !hasSavedSubs) {
     statusEl.textContent = 'Nenhuma legenda carregada.';
     return;
   }
-
-  /* --- Legenda --- */
   if (hasSavedSubs || srtBlob) {
     try {
       if (hasSavedSubs) {
@@ -633,50 +458,30 @@ async function restoreFiles() {
         const text = await srtBlob.text();
         subtitles = parseSubtitles(text);
       }
-
       lastSubtitleIndex = -1;
-      statusEl.textContent =
-        `♻️ Legenda restaurada: ${subtitles.length} linhas (${srtName || 'arquivo salvo'}).`;
-
+      statusEl.textContent = `♻️ Legenda restaurada: ${subtitles.length} linhas (${srtName || 'arquivo salvo'}).`;
       showSrtEditorPanel();
       renderSrtEditor();
-    } catch (e) {
-      console.warn(e);
-    }
+    } catch (e) { console.warn(e); }
   }
-
-  /* --- Vídeo --- */
   if (videoBlob) {
     if (videoObjectURL) URL.revokeObjectURL(videoObjectURL);
     videoObjectURL = URL.createObjectURL(videoBlob);
     videoPlayer.src = videoObjectURL;
-
     const savedTime = savedState.time || 0;
-
     const seekOnce = () => {
       videoPlayer.removeEventListener('loadedmetadata', seekOnce);
       if (savedTime > 0 && isFinite(savedTime)) {
-        try {
-          videoPlayer.currentTime = savedTime;
-          lastPersistAt = Date.now();
-        } catch (e) {
-          console.warn('Não foi possível restaurar a posição:', e);
-        }
+        try { videoPlayer.currentTime = savedTime; lastPersistAt = Date.now(); }
+        catch (e) { console.warn('Não foi possível restaurar a posição:', e); }
       }
       setVideoGain(videoVolume.value / 100);
     };
-
     videoPlayer.addEventListener('loadedmetadata', seekOnce);
-
-    statusEl.textContent =
-      `♻️ Vídeo restaurado (${videoName || 'arquivo salvo'}). ` +
-      `Toque em ▶️ para continuar de onde parou.`;
+    statusEl.textContent = `♻️ Vídeo restaurado (${videoName || 'arquivo salvo'}). Toque em ▶️ para continuar de onde parou.`;
   }
 }
 
-/* =========================================================
-   15) INICIALIZAÇÃO DE ÁUDIO / SALVAMENTO FINAL
-   ========================================================= */
 document.body.addEventListener('click', () => {
   initAudioContext();
   resumeAudioContext();
@@ -688,29 +493,23 @@ videoPlayer.addEventListener('play', () => {
   resumeAudioContext();
   setVideoGain(videoVolume.value / 100);
 });
-
 videoPlayer.addEventListener('pause', persistState);
 videoPlayer.addEventListener('ended', persistState);
 
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') {
     persistState();
-    if (subtitles.length) {
-      idbPut('subtitles', subtitles).catch(() => {});
-    }
+    if (subtitles.length) idbPut('subtitles', subtitles).catch(() => {});
   }
 });
-
 window.addEventListener('pagehide', () => {
   persistState();
-  if (subtitles.length) {
-    idbPut('subtitles', subtitles).catch(() => {});
-  }
+  if (subtitles.length) idbPut('subtitles', subtitles).catch(() => {});
 });
 window.addEventListener('beforeunload', persistState);
 
 /* =========================================================
-   16) EDITOR DE LEGENDAS EM TEMPO REAL
+   EDITOR DE LEGENDAS EM TEMPO REAL
    ========================================================= */
 const srtEditorPanel    = document.getElementById('srtEditorPanel');
 const toggleSrtEditor   = document.getElementById('toggleSrtEditor');
@@ -734,13 +533,11 @@ const srtEditorState = {
 };
 let lastHighlightedSubIndex = -1;
 
-/* ---------- helpers ---------- */
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, c => (
     {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]
   ));
 }
-
 function fmtTime(sec) {
   sec = Math.max(0, Math.round(sec * 1000) / 1000);
   const h  = Math.floor(sec / 3600);
@@ -749,7 +546,6 @@ function fmtTime(sec) {
   const ms = Math.round((sec - Math.floor(sec)) * 1000);
   return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')},${String(ms).padStart(3,'0')}`;
 }
-
 function parseFmtTime(str) {
   str = String(str).trim().replace(',', '.');
   let m = str.match(/^(\d+):(\d+):(\d+)(?:\.(\d+))?$/);
@@ -760,7 +556,6 @@ function parseFmtTime(str) {
   if (m) return (+m[1]) + (+(m[2]||'0').padEnd(3,'0').slice(0,3))/1000;
   return null;
 }
-
 function fmtDelta(sec) {
   const sign = sec < 0 ? '-' : '+';
   const abs = Math.abs(sec);
@@ -768,7 +563,6 @@ function fmtDelta(sec) {
   return `${sign}${abs.toFixed(2)}s`;
 }
 
-/* ---------- persistência das edições ---------- */
 function scheduleSaveSubtitles() {
   clearTimeout(scheduleSaveSubtitles._t);
   scheduleSaveSubtitles._t = setTimeout(async () => {
@@ -776,7 +570,6 @@ function scheduleSaveSubtitles() {
   }, 400);
 }
 
-/* ---------- painel ---------- */
 function showSrtEditorPanel() {
   srtEditorPanel.hidden = false;
   updateSrtEditorInfo();
@@ -787,10 +580,7 @@ function hideSrtEditorPanel() {
   srtToggleIcon.classList.remove('open');
 }
 function updateSrtEditorInfo() {
-  if (!subtitles.length) {
-    srtEditorInfo.textContent = 'nenhuma legenda';
-    return;
-  }
+  if (!subtitles.length) { srtEditorInfo.textContent = 'nenhuma legenda'; return; }
   let mod = 0;
   for (const s of subtitles) {
     if (s.startTime !== s.origStartTime || s.endTime !== s.origEndTime) mod++;
@@ -798,7 +588,6 @@ function updateSrtEditorInfo() {
   srtEditorInfo.textContent = `${subtitles.length} legendas` + (mod ? ` · ${mod} alterada(s)` : '');
 }
 
-/* ---------- render ---------- */
 function getFilteredSubIndices() {
   const q = srtEditorState.filter.trim().toLowerCase();
   if (!q) return subtitles.map((_, i) => i);
@@ -813,33 +602,27 @@ function getFilteredSubIndices() {
 function renderSrtEditor() {
   updateSrtEditorInfo();
   updateSrtUndoBtn();
-
   const scrollTop = srtList.scrollTop;
-
   if (!subtitles.length) {
     srtList.innerHTML = '<div class="srt-empty">Carregue um arquivo .SRT para editar as legendas.</div>';
     return;
   }
-
   const filtered = getFilteredSubIndices();
   if (!filtered.length) {
     srtList.innerHTML = `<div class="srt-empty">Nenhum resultado para "${escapeHtml(srtEditorState.filter)}"</div>`;
     return;
   }
-
   const frag = document.createDocumentFragment();
   filtered.forEach(i => {
     const sub = subtitles[i];
     const modified = sub.startTime !== sub.origStartTime || sub.endTime !== sub.origEndTime;
     const isEditing = srtEditorState.editingIndex === i;
     const dur = sub.endTime - sub.startTime;
-
     const row = document.createElement('div');
     row.className = 'srt-item'
       + (modified ? ' modified' : '')
       + (isEditing ? ' editing' : '');
     row.dataset.index = i;
-
     row.innerHTML = `
       <div class="srt-item-header">
         <button type="button" class="srt-seek" data-index="${i}" title="Ir para este tempo">▶</button>
@@ -850,24 +633,19 @@ function renderSrtEditor() {
       </div>
       <div class="srt-text">${escapeHtml(sub.text) || '<span style="color:#5c6274">(vazio)</span>'}</div>
     `;
-
     if (isEditing) row.appendChild(createSrtInlineEditor(i));
     frag.appendChild(row);
   });
-
   srtList.innerHTML = '';
   srtList.appendChild(frag);
   srtList.scrollTop = scrollTop;
-
   lastHighlightedSubIndex = -1;
   updateSrtHighlight();
 }
 
-/* ---------- editor inline ---------- */
 function createSrtInlineEditor(i) {
   const sub = subtitles[i];
   const buf = srtEditorState.editingBuffer;
-
   const el = document.createElement('div');
   el.className = 'srt-inline-editor';
   el.addEventListener('click', e => e.stopPropagation());
@@ -889,6 +667,7 @@ function createSrtInlineEditor(i) {
       <button type="button" class="btn" data-action="reset">↺ Restaurar</button>
       <button type="button" class="btn" data-action="this">Só este</button>
       <button type="button" class="btn btn-primary" data-action="forward">Este e os seguintes →</button>
+      <button type="button" class="btn" data-action="chain" title="Cola as seguintes emendadas, sem gaps">🔗 Encadear seguintes</button>
       <button type="button" class="btn" data-action="all">Em todos</button>
     </div>`;
 
@@ -908,7 +687,6 @@ function createSrtInlineEditor(i) {
       dd.className = 'srt-delta' + (d < 0 ? ' neg' : '');
     }
   }
-
   function readStart() {
     const v = parseFmtTime(startInput.value);
     if (v === null) { startInput.value = fmtTime(buf.startTime); return; }
@@ -923,7 +701,6 @@ function createSrtInlineEditor(i) {
     buf.endTime = v <= buf.startTime ? buf.startTime + 0.1 : v;
     refresh();
   }
-
   startInput.addEventListener('change', readStart);
   startInput.addEventListener('blur',   readStart);
   endInput.addEventListener('change',   readEnd);
@@ -948,6 +725,7 @@ function createSrtInlineEditor(i) {
   });
   el.querySelector('[data-action="this"]').addEventListener('click', () => applySrtThis(i));
   el.querySelector('[data-action="forward"]').addEventListener('click', () => applySrtForward(i));
+  el.querySelector('[data-action="chain"]').addEventListener('click', () => applySrtChain(i));
   el.querySelector('[data-action="all"]').addEventListener('click', () => applySrtAll(i));
 
   refresh();
@@ -960,7 +738,6 @@ function closeSrtInlineEditor() {
   renderSrtEditor();
 }
 
-/* ---------- aplicar edições ---------- */
 function pushSrtHistory() {
   srtEditorState.history.push(subtitles.map(s => ({ ...s })));
   if (srtEditorState.history.length > 30) srtEditorState.history.shift();
@@ -977,29 +754,80 @@ function applySrtThis(i) {
   pushSrtHistory();
   subtitles[i].startTime = Math.max(0, buf.startTime);
   subtitles[i].endTime   = Math.max(subtitles[i].startTime + 0.1, buf.endTime);
-  lastSubtitleIndex = -1;   // <- NOVO: força re-narrar após edição
+  lastSubtitleIndex = -1;
   closeSrtInlineEditor();
   scheduleSaveSubtitles();
 }
 
+/* =========================================================
+   "Este e os seguintes →"
+   - Se o INÍCIO mudou: desloca todas as seguintes pelo mesmo delta
+     (preserva os gaps originais entre elas)
+   - Se o FIM cresceu sobre o próximo sub: empurra os seguintes
+     em cascata para eliminar sobreposição
+   ========================================================= */
 function applySrtForward(i) {
   const buf = srtEditorState.editingBuffer;
   if (!buf) return;
   pushSrtHistory();
-  const delta = buf.startTime - subtitles[i].startTime;
+
+  const deltaStart = buf.startTime - subtitles[i].startTime;
+
+  // Aplica o novo tempo ao sub atual
+  subtitles[i].startTime = Math.max(0, buf.startTime);
+  subtitles[i].endTime   = Math.max(subtitles[i].startTime + 0.1, buf.endTime);
+
+  // 1) Desloca os seguintes pelo mesmo deltaStart (mantém gaps originais)
+  if (deltaStart !== 0) {
+    for (let j = i + 1; j < subtitles.length; j++) {
+      const s = subtitles[j];
+      const dur = s.endTime - s.startTime;
+      s.startTime = Math.max(0, s.startTime + deltaStart);
+      s.endTime   = s.startTime + dur;
+    }
+  }
+
+  // 2) Corrige sobreposições em cascata (caso o sub atual tenha crescido
+  //    além do próximo sub, empurra os seguintes)
+  for (let j = i + 1; j < subtitles.length; j++) {
+    const prev = subtitles[j - 1];
+    const curr = subtitles[j];
+    if (curr.startTime < prev.endTime) {
+      const dur = curr.endTime - curr.startTime;
+      curr.startTime = prev.endTime;
+      curr.endTime   = curr.startTime + dur;
+    } else {
+      break;
+    }
+  }
+
+  lastSubtitleIndex = -1;
+  closeSrtInlineEditor();
+  scheduleSaveSubtitles();
+}
+
+/* =========================================================
+   "Encadear seguintes" — NOVO
+   Cola todas as seguintes emendadas: cada uma começa exatamente
+   quando a anterior termina. Elimina todos os gaps.
+   ========================================================= */
+function applySrtChain(i) {
+  const buf = srtEditorState.editingBuffer;
+  if (!buf) return;
+  pushSrtHistory();
 
   subtitles[i].startTime = Math.max(0, buf.startTime);
   subtitles[i].endTime   = Math.max(subtitles[i].startTime + 0.1, buf.endTime);
 
-  if (delta !== 0) {
-    for (let j = i + 1; j < subtitles.length; j++) {
-      const s = subtitles[j];
-      const dur = s.endTime - s.startTime;
-      s.startTime = Math.max(0, s.startTime + delta);
-      s.endTime   = s.startTime + dur;
-    }
+  let cursor = subtitles[i].endTime;
+  for (let j = i + 1; j < subtitles.length; j++) {
+    const dur = subtitles[j].endTime - subtitles[j].startTime;
+    subtitles[j].startTime = cursor;
+    subtitles[j].endTime   = cursor + dur;
+    cursor = subtitles[j].endTime;
   }
-  lastSubtitleIndex = -1;   // <- NOVO: força re-narrar após edição
+
+  lastSubtitleIndex = -1;
   closeSrtInlineEditor();
   scheduleSaveSubtitles();
 }
@@ -1009,7 +837,6 @@ function applySrtAll(i) {
   if (!buf) return;
   pushSrtHistory();
   const delta = buf.startTime - subtitles[i].startTime;
-
   for (let j = 0; j < subtitles.length; j++) {
     if (j === i) {
       subtitles[j].startTime = Math.max(0, buf.startTime);
@@ -1021,7 +848,7 @@ function applySrtAll(i) {
       s.endTime   = s.startTime + dur;
     }
   }
-  lastSubtitleIndex = -1;   // <- NOVO: força re-narrar após edição
+  lastSubtitleIndex = -1;
   closeSrtInlineEditor();
   scheduleSaveSubtitles();
 }
@@ -1037,7 +864,7 @@ function applySrtGlobalShift() {
   }
   srtEditorState.editingIndex = -1;
   srtEditorState.editingBuffer = null;
-  lastSubtitleIndex = -1;   // <- NOVO: força re-narrar após edição
+  lastSubtitleIndex = -1;
   renderSrtEditor();
   scheduleSaveSubtitles();
 }
@@ -1066,25 +893,20 @@ function revertAllSrtEdits() {
   scheduleSaveSubtitles();
 }
 
-/* ---------- navegação / destaque ---------- */
 function seekToSub(i) {
   const s = subtitles[i];
   if (!s) return;
-  try { videoPlayer.currentTime = s.startTime; } catch (e) { /* ignore */ }
+  try { videoPlayer.currentTime = s.startTime; } catch (e) {}
 }
 
 function updateSrtHighlight() {
   if (!srtEditorBody || srtEditorBody.hidden || !subtitles.length) return;
-
   const t = videoPlayer.currentTime;
   const idx = subtitles.findIndex(s => t >= s.startTime && t <= s.endTime);
-
   if (idx === lastHighlightedSubIndex) return;
   lastHighlightedSubIndex = idx;
-
   const prev = srtList.querySelector('.srt-item.active');
   if (prev) prev.classList.remove('active');
-
   if (idx !== -1) {
     const row = srtList.querySelector(`.srt-item[data-index="${idx}"]`);
     if (row) row.classList.add('active');
@@ -1102,14 +924,12 @@ function followCurrentSub() {
   let idx = subtitles.findIndex(s => t >= s.startTime && t <= s.endTime);
   if (idx === -1) idx = subtitles.findIndex(s => s.startTime > t);
   if (idx === -1) idx = subtitles.length - 1;
-
   const filtered = getFilteredSubIndices();
   if (!filtered.includes(idx)) {
     srtEditorState.filter = '';
     srtSearch.value = '';
     renderSrtEditor();
   }
-
   const row = srtList.querySelector(`.srt-item[data-index="${idx}"]`);
   if (row) {
     row.scrollIntoView({ block: 'center', behavior: 'smooth' });
@@ -1118,13 +938,11 @@ function followCurrentSub() {
   }
 }
 
-/* ---------- exportar ---------- */
 function downloadSrt() {
   if (!subtitles.length) return;
   const srt = subtitles.map((s, i) =>
     `${i + 1}\n${fmtTime(s.startTime)} --> ${fmtTime(s.endTime)}\n${s.text}`
   ).join('\n\n') + '\n';
-
   const blob = new Blob([srt], { type: 'text/plain;charset=utf-8' });
   const url  = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -1134,7 +952,6 @@ function downloadSrt() {
   URL.revokeObjectURL(url);
 }
 
-/* ---------- eventos do painel ---------- */
 toggleSrtEditor.addEventListener('click', () => {
   const open = srtEditorBody.hidden;
   srtEditorBody.hidden = !open;
@@ -1144,21 +961,12 @@ toggleSrtEditor.addEventListener('click', () => {
 
 srtList.addEventListener('click', (e) => {
   if (e.target.closest('.srt-inline-editor')) return;
-
   const seekBtn = e.target.closest('.srt-seek');
-  if (seekBtn) {
-    seekToSub(+seekBtn.dataset.index);
-    return;
-  }
-
+  if (seekBtn) { seekToSub(+seekBtn.dataset.index); return; }
   const row = e.target.closest('.srt-item');
   if (!row) return;
-
   const i = +row.dataset.index;
-  if (srtEditorState.editingIndex === i) {
-    closeSrtInlineEditor();
-    return;
-  }
+  if (srtEditorState.editingIndex === i) { closeSrtInlineEditor(); return; }
   srtEditorState.editingIndex = i;
   srtEditorState.editingBuffer = {
     startTime: subtitles[i].startTime,
@@ -1187,7 +995,6 @@ srtUndoBtn.addEventListener('click', undoSrtEdit);
 srtRevertAllBtn.addEventListener('click', revertAllSrtEdits);
 srtExportBtn.addEventListener('click', downloadSrt);
 
-/* atalhos globais (respeitando campos de texto) */
 document.addEventListener('keydown', (e) => {
   const inField = e.target.closest('input, textarea, select');
   if (inField) return;
@@ -1200,7 +1007,4 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-/* =========================================================
-   17) START
-   ========================================================= */
 restoreFiles();
