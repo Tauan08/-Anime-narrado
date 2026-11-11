@@ -1,132 +1,1779 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>Anime Dubber AI</title>
-  <link rel="stylesheet" href="style.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Anime Dubber Platform — Dublagem Neural + MP3</title>
+<meta name="description" content="Duble animes com voz neural natural (sem voz robótica): narração em tempo real com o vídeo ou exportação de MP3 dublado no ritmo do SRT.">
+<style>
+body {
+    background-color: #121214;
+    color: #e1e1e6;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    margin: 0;
+    padding: 16px;
+    box-sizing: border-box;
+  }
+  .container {
+    background-color: #202024;
+    padding: 30px;
+    border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+    max-width: 800px;
+    width: 100%;
+    text-align: center;
+  }
+  h1 { color: #00adb5; margin-bottom: 5px; }
+  .subtitle { color: #87868b; margin-bottom: 25px; }
+  .upload-section {
+    display: flex; flex-wrap: wrap; justify-content: space-between;
+    gap: 20px; margin-bottom: 20px;
+  }
+  .file-input {
+    flex: 1 1 200px; background: #29292e; padding: 15px; border-radius: 6px;
+    border: 1px dashed #4d4d57; display: flex; flex-direction: column; align-items: center;
+  }
+  .file-input label { margin-bottom: 10px; font-weight: bold; }
+  input[type="file"] { width: 100%; }
+  .status { font-size: 0.9rem; color: #00adb5; margin: -10px 0 15px; min-height: 1.2em; }
+  .status.err { color: #e04b3b; }
+  .status.ok { color: #28a870; }
+  .controls-section {
+    background: #29292e; padding: 15px; border-radius: 6px; margin-bottom: 20px;
+    display: flex; flex-wrap: wrap; gap: 15px; justify-content: space-around; align-items: center;
+  }
+  .control { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; flex: 1 1 180px; }
+  .control label { font-size: 0.9rem; color: #c4c4cc; text-align: left; }
+  select, input[type="range"] {
+    background: #121214; color: #fff; border: 1px solid #4d4d57;
+    padding: 8px; border-radius: 4px; width: 100%;
+  }
+  select { max-width: 260px; }
+  .check {
+    display: flex; align-items: center; gap: 8px; font-size: 0.95rem;
+    color: #c4c4cc; flex: 1 1 200px; text-align: left;
+  }
+  .btn {
+    background: #00adb5; color: #121214; border: none; padding: 10px 18px;
+    border-radius: 6px; font-weight: bold; cursor: pointer;
+    transition: background 0.2s, transform 0.1s; font-size: 0.95rem;
+  }
+  .btn:hover   { background: #00cfd9; }
+  .btn:active  { transform: scale(0.97); }
+  .btn:disabled { opacity: .45; cursor: not-allowed; filter: grayscale(.3); }
+  .btn-secondary { background: #3a3a42; color: #e1e1e6; }
+  .btn-secondary:hover { background: #4d4d57; }
+  .btn-warn { background: #b9821a; color: #121214; }
+  .btn-warn:hover { background: #d99a24; }
+  .btn-danger { background: #c0392b; color: #fff; }
+  .btn-danger:hover { background: #e04b3b; }
+  .btn-success { background: #1f8a5c; color: #fff; }
+  .btn-success:hover { background: #28a870; }
+  .btn-primary { background: #00adb5; color: #121214; }
+  .actions-section { background: #1c1c20; border: 1px solid #3a3a42; }
+  .player-container { margin-top: 20px; background: #000; border-radius: 6px; overflow: hidden; }
+  video { width: 100%; display: block; max-height: 450px; }
+  .hint { font-size: 0.85rem; color: #87868b; margin-top: 15px; line-height: 1.4; }
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: flex;
+    align-items: center; justify-content: center; z-index: 9999; padding: 20px; box-sizing: border-box;
+  }
+  .modal-overlay[hidden] { display: none; }
+  .modal-box {
+    background: #202024; border: 1px solid #3a3a42; border-radius: 10px;
+    padding: 24px; max-width: 420px; width: 100%; text-align: center;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.6);
+  }
+  .modal-box h2 { margin: 0 0 10px; color: #00adb5; font-size: 1.15rem; }
+  .modal-box p  { margin: 0 0 20px; color: #c4c4cc; font-size: 0.95rem; line-height: 1.4; }
+  .modal-actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+  /* ===== NEURAL / EXPORT ===== */
+  .neural-panel { background: #1c1c20; border: 1px solid #00adb5; }
+  .progress { height: 10px; background: #121214; border-radius: 999px; overflow: hidden; margin-top: 10px; border: 1px solid #3a3a42; flex: 1 1 100%; }
+  .progress i { display: block; height: 100%; width: 0%; background: linear-gradient(90deg,#00adb5,#00e0b8); transition: width .25s; }
+  .dub-status { flex: 1 1 100%; text-align: left; font-size: 0.85rem; color: #87868b; min-height: 1.2em; }
+  .fit-list { flex: 1 1 100%; text-align: left; font-size: 0.8rem; color: #c4c4cc; max-height: 130px; overflow-y: auto; background: #121214; border: 1px solid #3a3a42; border-radius: 6px; padding: 8px 12px; margin: 4px 0 0; list-style: none; }
+  .fit-list li { margin: 2px 0; }
+  .fit-list .bad { color: #e04b3b; }
+  .fit-list .warn { color: #b9821a; }
+  /* ===== EDITOR DE LEGENDAS ===== */
+  .srt-editor-panel {
+    margin-top: 20px; background: #1c1c20; border: 1px solid #3a3a42;
+    border-radius: 8px; overflow: hidden; text-align: left;
+  }
+  .srt-toggle {
+    width: 100%; background: #29292e; border: none; color: #e1e1e6;
+    padding: 14px 18px; font-size: 1rem; font-weight: bold; cursor: pointer;
+    display: flex; align-items: center; gap: 10px; text-align: left; transition: background 0.15s;
+  }
+  .srt-toggle:hover { background: #33333a; }
+  .srt-toggle-icon { font-size: 0.8rem; transition: transform 0.2s; display: inline-block; color: #00adb5; }
+  .srt-toggle-icon.open { transform: rotate(90deg); }
+  .srt-editor-info { margin-left: auto; font-size: 0.85rem; font-weight: normal; color: #87868b; }
+  .srt-editor-body { padding: 15px; border-top: 1px solid #3a3a42; }
+  .srt-editor-toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; align-items: center; }
+  .srt-search {
+    flex: 1 1 200px; min-width: 150px; background: #121214; border: 1px solid #4d4d57;
+    color: #fff; padding: 8px 12px; border-radius: 6px; font-family: inherit; font-size: 0.9rem;
+  }
+  .srt-search:focus { outline: none; border-color: #00adb5; }
+  .srt-global-shift {
+    display: flex; align-items: center; gap: 6px; background: #121214;
+    padding: 5px 10px; border-radius: 6px; border: 1px solid #4d4d57; font-size: 0.85rem; color: #87868b;
+  }
+  .srt-shift-input {
+    width: 70px; background: #29292e; border: 1px solid #4d4d57; color: #fff;
+    padding: 5px 8px; border-radius: 4px; font-family: inherit; font-size: 0.85rem;
+  }
+  .btn-small { padding: 6px 12px; font-size: 0.8rem; }
+  .srt-list {
+    max-height: 450px; overflow-y: auto; background: #121214;
+    border: 1px solid #3a3a42; border-radius: 6px; padding: 4px;
+  }
+  .srt-empty { padding: 40px 20px; text-align: center; color: #5c6274; font-size: 0.9rem; }
+  .srt-item {
+    padding: 10px 12px; border-radius: 6px; cursor: pointer; transition: background 0.1s;
+    border-left: 3px solid transparent; margin-bottom: 4px; background: #1c1c20;
+  }
+  .srt-item:hover { background: #29292e; }
+  .srt-item.modified { border-left-color: #b9821a; }
+  .srt-item.active { background: rgba(0,173,181,0.10); border-left-color: #00adb5; }
+  .srt-item.editing { background: rgba(0,173,181,0.15); border-left-color: #00adb5; }
+  @keyframes srtFlash { 0%, 100% { background: #1c1c20; } 50% { background: rgba(0,173,181,0.35); } }
+  .srt-item.flash { animation: srtFlash 1.2s ease; }
+  .srt-item-header { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; flex-wrap: wrap; }
+  .srt-seek {
+    background: #29292e; border: 1px solid #4d4d57; color: #00adb5;
+    padding: 2px 8px; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-family: inherit; transition: background 0.15s;
+  }
+  .srt-seek:hover { background: #00adb5; color: #121214; }
+  .srt-num { font-family: 'SF Mono', Menlo, Consolas, monospace; font-size: 0.8rem; color: #5c6274; min-width: 30px; }
+  .srt-time { font-family: 'SF Mono', Menlo, Consolas, monospace; font-size: 0.8rem; color: #a4a4b0; }
+  .srt-dur { font-family: 'SF Mono', Menlo, Consolas, monospace; font-size: 0.75rem; color: #5c6274; }
+  .srt-badge { font-size: 0.7rem; background: #b9821a; color: #121214; padding: 1px 6px; border-radius: 3px; font-weight: bold; }
+  .srt-text { font-size: 0.9rem; color: #c4c4cc; line-height: 1.4; word-break: break-word; }
+  .srt-inline-editor { margin-top: 10px; padding: 12px; background: #121214; border: 1px solid #4d4d57; border-radius: 6px; cursor: default; }
+  .srt-time-row { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; }
+  .srt-time-row label { width: 50px; color: #87868b; font-size: 0.8rem; flex-shrink: 0; }
+  .srt-time-input {
+    flex: 1; min-width: 130px; background: #29292e; border: 1px solid #4d4d57; color: #fff;
+    padding: 7px 10px; border-radius: 4px; font-family: 'SF Mono', Menlo, Consolas, monospace; font-size: 0.85rem;
+  }
+  .srt-time-input:focus { outline: none; border-color: #00adb5; box-shadow: 0 0 0 2px rgba(0,173,181,0.2); }
+  .srt-shift-btn {
+    background: #29292e; border: 1px solid #4d4d57; color: #e1e1e6; padding: 5px 8px;
+    border-radius: 4px; cursor: pointer; font-size: 0.75rem; font-family: 'SF Mono', Menlo, Consolas, monospace; transition: all 0.15s;
+  }
+  .srt-shift-btn:hover { background: #3a3a42; }
+  .srt-delta { font-family: 'SF Mono', Menlo, Consolas, monospace; font-size: 0.8rem; color: #b9821a; margin-left: auto; padding: 4px 8px; }
+  .srt-delta.neg { color: #00adb5; }
+  .srt-delta.zero { color: #5c6274; }
+  .srt-editor-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; padding-top: 10px; border-top: 1px solid #3a3a42; }
+  .srt-editor-actions .btn { flex: 1 1 auto; min-width: 100px; justify-content: center; font-size: 0.8rem; padding: 8px 10px; }
+</style>
 </head>
 <body>
-  <div class="container">
-    <h1>Anime Dubber Platform 🎧</h1>
-    <p class="subtitle">Anexe o vídeo do anime e a legenda para gerar a narração em tempo real</p>
+<div class="container">
+  <h1>Anime Dubber Platform 🎧</h1>
+  <p class="subtitle">Anexe o vídeo do anime e a legenda para dublar com voz neural — ou só a legenda para gerar o MP3 dublado no ritmo do SRT</p>
 
-    <div class="upload-section">
-      <div class="file-input">
-        <label for="videoFile">🎬 Selecionar Vídeo (MP4):</label>
-        <input type="file" id="videoFile" accept="video/mp4,video/webm,video/*">
-      </div>
-      <div class="file-input">
-        <label for="srtFile">📝 Selecionar Legenda (.SRT ou .VTT):</label>
-        <input type="file" id="srtFile" accept=".srt,.vtt,text/vtt">
-      </div>
+  <div class="upload-section">
+    <div class="file-input">
+      <label for="videoFile">🎬 Selecionar Vídeo (MP4):</label>
+      <input type="file" id="videoFile" accept="video/mp4,video/webm,video/*">
     </div>
-
-    <p id="status" class="status">Nenhuma legenda carregada.</p>
-
-    <!-- VOZ -->
-    <div class="controls-section">
-      <div class="control">
-        <label for="voiceSelect">🗣️ Escolha a Voz:</label>
-        <select id="voiceSelect"><option value="">Carregando vozes...</option></select>
-      </div>
-      <button id="testVoice" type="button" class="btn">🔊 Testar voz</button>
-    </div>
-
-    <!-- VOLUMES -->
-    <div class="controls-section">
-      <div class="control">
-        <label>🔉 Volume do vídeo (anime): <span id="videoVolVal">100</span>%</label>
-        <input type="range" id="videoVolume" min="0" max="100" step="1" value="100">
-      </div>
-
-      <div class="control">
-        <label>🗣️ Volume da voz narrativa: <span id="voiceVolVal">100</span>%</label>
-        <input type="range" id="voiceVolume" min="0" max="100" step="1" value="100">
-      </div>
-
-      <div class="control">
-        <label>⏩ Velocidade da voz: <span id="rateVal">1.2</span>x</label>
-        <input type="range" id="rate" min="0.5" max="2" step="0.1" value="1.2">
-      </div>
-    </div>
-
-    <!-- DUCKING -->
-    <div class="controls-section">
-      <label class="check">
-        <input type="checkbox" id="ducking" checked>
-        Abaixar o vídeo automaticamente quando a voz falar
-      </label>
-
-      <div class="control">
-        <label>Nível do vídeo durante a fala: <span id="duckVal">25</span>%</label>
-        <input type="range" id="duckLevel" min="0" max="100" step="1" value="25">
-      </div>
-    </div>
-
-    <div class="player-container">
-      <video id="videoPlayer" controls playsinline webkit-playsinline preload="metadata">
-        Seu navegador não suporta a reprodução de vídeos.
-      </video>
-    </div>
-
-    <!-- ============ EDITOR DE LEGENDAS EM TEMPO REAL ============ -->
-    <div class="srt-editor-panel" id="srtEditorPanel" hidden>
-      <button id="toggleSrtEditor" type="button" class="srt-toggle">
-        <span class="srt-toggle-icon" id="srtToggleIcon">▶</span>
-        <span>📝 Editar Legendas em Tempo Real</span>
-        <span class="srt-editor-info" id="srtEditorInfo"></span>
-      </button>
-
-      <div id="srtEditorBody" class="srt-editor-body" hidden>
-        <div class="srt-editor-toolbar">
-          <input type="text" id="srtSearch" class="srt-search" placeholder="🔍 Buscar legenda ou tempo...">
-
-          <div class="srt-global-shift">
-            <span>Deslocar todos:</span>
-            <input type="number" id="srtGlobalShift" class="srt-shift-input" value="0" step="0.1">
-            <span>s</span>
-            <button type="button" id="srtApplyGlobalShift" class="btn btn-small">Aplicar</button>
-          </div>
-
-          <button type="button" id="srtFollowPlayback" class="btn btn-small">🎯 Ir para atual</button>
-          <button type="button" id="srtUndo" class="btn btn-small" disabled>↶ Desfazer</button>
-          <button type="button" id="srtRevertAll" class="btn btn-small" disabled>↺ Reverter tudo</button>
-          <button type="button" id="srtExport" class="btn btn-small btn-success">💾 Baixar SRT</button>
-        </div>
-
-        <div class="srt-list" id="srtList">
-          <div class="srt-empty">Carregue um arquivo .SRT para editar as legendas.</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- AÇÕES / LIMPEZA -->
-    <div class="controls-section actions-section">
-      <button id="clearVideoBtn" type="button" class="btn btn-warn">🎬 Limpar só o vídeo</button>
-      <button id="clearSrtBtn"   type="button" class="btn btn-warn">📝 Limpar só a legenda</button>
-      <button id="clearData"     type="button" class="btn btn-danger">🗑️ Limpar TUDO</button>
-    </div>
-
-    <p class="hint">
-      ⚠️ No celular o volume do sistema controla o volume geral.
-      Use os controles acima para abaixar <strong>só o vídeo</strong> e manter a voz alta.<br>
-      💾 Vídeo, legenda, posição e preferências são salvos automaticamente neste aparelho.
-    </p>
-  </div>
-
-  <!-- ===== MODAL DE CONFIRMAÇÃO ===== -->
-  <div id="confirmOverlay" class="modal-overlay" hidden>
-    <div class="modal-box">
-      <h2 id="confirmTitle">Confirmar</h2>
-      <p id="confirmMessage">Tem certeza?</p>
-      <div class="modal-actions">
-        <button id="confirmCancel" type="button" class="btn btn-secondary">Cancelar</button>
-        <button id="confirmOk"     type="button" class="btn btn-danger">Sim, apagar</button>
-      </div>
+    <div class="file-input">
+      <label for="srtFile">📝 Selecionar Legenda (.SRT ou .VTT):</label>
+      <input type="file" id="srtFile" accept=".srt,.vtt,text/vtt">
     </div>
   </div>
 
-  <script src="script.js"></script>
+  <p id="status" class="status">Nenhuma legenda carregada.</p>
+
+  <!-- VOZ NEURAL -->
+  <div class="controls-section">
+    <div class="control">
+      <label for="voiceLang">🌎 Idioma da voz:</label>
+      <select id="voiceLang"></select>
+    </div>
+    <div class="control">
+      <label for="voiceSelect">🗣️ Voz neural (grátis, sem robô):</label>
+      <select id="voiceSelect"><option value="">Carregando vozes...</option></select>
+    </div>
+    <button id="testVoice" type="button" class="btn">🔊 Testar voz</button>
+  </div>
+
+  <!-- VOLUMES -->
+  <div class="controls-section">
+    <div class="control">
+      <label>🔉 Volume do vídeo (anime): <span id="videoVolVal">100</span>%</label>
+      <input type="range" id="videoVolume" min="0" max="100" step="1" value="100">
+    </div>
+    <div class="control">
+      <label>🗣️ Volume da voz narrativa: <span id="voiceVolVal">100</span>%</label>
+      <input type="range" id="voiceVolume" min="0" max="100" step="1" value="100">
+    </div>
+    <div class="control">
+      <label>⏩ Velocidade da voz: <span id="rateVal">1.2</span>x</label>
+      <input type="range" id="rate" min="0.5" max="2" step="0.05" value="1.2">
+    </div>
+  </div>
+
+  <!-- DUCKING -->
+  <div class="controls-section">
+    <label class="check">
+      <input type="checkbox" id="ducking" checked>
+      Abaixar o vídeo automaticamente quando a voz falar
+    </label>
+    <div class="control">
+      <label>Nível do vídeo durante a fala: <span id="duckVal">25</span>%</label>
+      <input type="range" id="duckLevel" min="0" max="100" step="1" value="25">
+    </div>
+  </div>
+
+  <!-- PRÉ-GERAÇÃO NEURAL -->
+  <div class="controls-section neural-panel">
+    <div class="control" style="flex:1 1 100%;align-items:stretch;text-align:left">
+      <label>🧠 Vozes neurais das falas (gera uma vez, depois dubla sem internet e sem espera):</label>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button id="pregenBtn" type="button" class="btn">⬇ Gerar vozes de todas as falas</button>
+        <button id="pregenCancelBtn" type="button" class="btn btn-secondary" disabled>Cancelar</button>
+      </div>
+    </div>
+    <div class="dub-status" id="dubStatus">Nenhuma fala gerada ainda.</div>
+    <div class="progress"><i id="dubProgress"></i></div>
+  </div>
+
+  <!-- EXPORTAR MP3 NO RITMO DO SRT -->
+  <div class="controls-section neural-panel">
+    <div class="control" style="flex:1 1 100%;align-items:stretch;text-align:left">
+      <label>🎧 Exportar MP3 dublado (só a legenda, sem vídeo — cada fala no seu tempo do SRT):</label>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button id="exportBtn" type="button" class="btn btn-success">🎧 Gerar MP3 dublado</button>
+        <button id="exportCancelBtn" type="button" class="btn btn-secondary" disabled>Cancelar</button>
+        <button id="dlDubBtn" type="button" class="btn" disabled>⬇ Baixar MP3</button>
+      </div>
+    </div>
+    <div class="dub-status" id="exportStatus">Ideal para muxar fora daqui (CapCut, Premiere etc.): o áudio sai sincronizado com os tempos da legenda.</div>
+    <div class="progress"><i id="exportProgress"></i></div>
+    <ul class="fit-list" id="fitList" hidden></ul>
+  </div>
+
+  <div class="player-container">
+    <video id="videoPlayer" controls playsinline webkit-playsinline preload="metadata">
+      Seu navegador não suporta a reprodução de vídeos.
+    </video>
+  </div>
+
+  <!-- ============ EDITOR DE LEGENDAS EM TEMPO REAL ============ -->
+  <div class="srt-editor-panel" id="srtEditorPanel" hidden>
+    <button type="button" id="toggleSrtEditor" class="srt-toggle">
+      <span class="srt-toggle-icon" id="srtToggleIcon">▶</span>
+      <span>📝 Editar Legendas em Tempo Real</span>
+      <span class="srt-editor-info" id="srtEditorInfo"></span>
+    </button>
+    <div id="srtEditorBody" class="srt-editor-body" hidden>
+      <div class="srt-editor-toolbar">
+        <input type="text" id="srtSearch" class="srt-search" placeholder="🔍 Buscar legenda ou tempo...">
+        <div class="srt-global-shift">
+          <span>Deslocar todos:</span>
+          <input type="number" id="srtGlobalShift" class="srt-shift-input" value="0" step="0.1">
+          <span>s</span>
+          <button type="button" id="srtApplyGlobalShift" class="btn btn-small">Aplicar</button>
+        </div>
+        <button type="button" id="srtFollowPlayback" class="btn btn-small">🎯 Ir para atual</button>
+        <button type="button" id="srtUndo" class="btn btn-small" disabled>↶ Desfazer</button>
+        <button type="button" id="srtRevertAll" class="btn btn-small" disabled>↺ Reverter tudo</button>
+        <button type="button" id="srtExport" class="btn btn-small btn-success">💾 Baixar SRT</button>
+      </div>
+      <div class="srt-list" id="srtList">
+        <div class="srt-empty">Carregue um arquivo .SRT para editar as legendas.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- AÇÕES / LIMPEZA -->
+  <div class="controls-section actions-section">
+    <button id="clearVideoBtn" type="button" class="btn btn-warn">🎬 Limpar só o vídeo</button>
+    <button id="clearSrtBtn"   type="button" class="btn btn-warn">📝 Limpar só a legenda</button>
+    <button id="clearData"     type="button" class="btn btn-danger">🗑️ Limpar TUDO</button>
+  </div>
+
+  <p class="hint">
+    ⚠️ No celular o volume do sistema controla o volume geral.
+    Use os controles acima para abaixar <strong>só o vídeo</strong> e manter a voz alta.<br>
+    💾 Vídeo, legenda, posição e preferências são salvos automaticamente neste aparelho.
+    As vozes neurais geradas ficam em cache no aparelho para não gerar de novo.<br>
+    🎧 O MP3 dublado funciona <strong>só com a legenda</strong> (sem precisar do vídeo) e já sai no ritmo do SRT.
+  </p>
+</div>
+
+<!-- ===== MODAL DE CONFIRMAÇÃO ===== -->
+<div id="confirmOverlay" class="modal-overlay" hidden>
+  <div class="modal-box">
+    <h2 id="confirmTitle">Confirmar</h2>
+    <p id="confirmMessage">Tem certeza?</p>
+    <div class="modal-actions">
+      <button id="confirmCancel" type="button" class="btn btn-secondary">Cancelar</button>
+      <button id="confirmOk" type="button" class="btn btn-danger">Sim, apagar</button>
+    </div>
+  </div>
+</div>
+<script>
+"use strict";
+/* =========================================================
+   Anime Dubber Platform v2 — voz neural + MP3 no ritmo do SRT
+   - Narração em tempo real: usa as falas neurais pré-geradas
+     (com a voz do aparelho como reserva instantânea)
+   - Gerar MP3 dublado: monta a faixa só com a legenda, cada
+     fala no seu tempo, para muxar fora daqui
+   ========================================================= */
+
+const videoPlayer   = document.getElementById('videoPlayer');
+const videoFile     = document.getElementById('videoFile');
+const srtFile       = document.getElementById('srtFile');
+const voiceSelect   = document.getElementById('voiceSelect');
+const voiceLang     = document.getElementById('voiceLang');
+const rateInput     = document.getElementById('rate');
+const rateVal       = document.getElementById('rateVal');
+const videoVolume   = document.getElementById('videoVolume');
+const videoVolVal   = document.getElementById('videoVolVal');
+const voiceVolume   = document.getElementById('voiceVolume');
+const voiceVolVal   = document.getElementById('voiceVolVal');
+const duckingCheck  = document.getElementById('ducking');
+const duckLevel     = document.getElementById('duckLevel');
+const duckVal       = document.getElementById('duckVal');
+const statusEl      = document.getElementById('status');
+const testVoiceBtn  = document.getElementById('testVoice');
+const pregenBtn     = document.getElementById('pregenBtn');
+const pregenCancelBtn = document.getElementById('pregenCancelBtn');
+const dubStatus     = document.getElementById('dubStatus');
+const dubProgress   = document.getElementById('dubProgress');
+const exportBtn     = document.getElementById('exportBtn');
+const exportCancelBtn = document.getElementById('exportCancelBtn');
+const dlDubBtn      = document.getElementById('dlDubBtn');
+const exportStatus  = document.getElementById('exportStatus');
+const exportProgress = document.getElementById('exportProgress');
+const fitList       = document.getElementById('fitList');
+
+const clearVideoBtn = document.getElementById('clearVideoBtn');
+const clearSrtBtn   = document.getElementById('clearSrtBtn');
+const clearDataBtn  = document.getElementById('clearData');
+
+const confirmOverlay = document.getElementById('confirmOverlay');
+const confirmTitle   = document.getElementById('confirmTitle');
+const confirmMessage = document.getElementById('confirmMessage');
+const confirmCancel  = document.getElementById('confirmCancel');
+const confirmOk      = document.getElementById('confirmOk');
+
+let subtitles = [];
+let lastSubtitleIndex = -1;
+const synth = window.speechSynthesis;
+let sysVoices = [];
+let currentUtterance = null;
+let currentSource = null;
+
+let audioCtx = null;
+let videoSource = null;
+let videoGain = null;
+let voiceGain = null;
+let audioInitialized = false;
+
+const LS_KEY     = 'animeDubber.state.v2';
+const DB_NAME    = 'animeDubberDB';
+const DB_VERSION = 1;
+const STORE      = 'files';
+
+let videoName = '';
+let srtName   = '';
+let videoObjectURL = null;
+
+/* ================= NUVEM NEURAL (HTTP, sem chave) ================= */
+const SPACE_ID = 'innoai/Edge-TTS-Text-to-Speech';
+const spaceOrigin = 'https://innoai-edge-tts-text-to-speech.hf.space';
+let NEURAL_LABELS = [];
+const FALLBACK_NEURAL = [
+  'pt-BR-FranciscaNeural - pt-BR (Female)', 'pt-BR-AntonioNeural - pt-BR (Male)',
+  'pt-BR-ThalitaMultilingualNeural - pt-BR (Female)',
+  'pt-PT-DuarteNeural - pt-PT (Male)', 'pt-PT-RaquelNeural - pt-PT (Female)',
+  'en-US-AvaNeural - en-US (Female)', 'en-US-AndrewNeural - en-US (Male)',
+  'es-ES-ElviraNeural - es-ES (Female)', 'es-ES-AlvaroNeural - es-ES (Male)',
+  'fr-FR-VivienneNeural - fr-FR (Female)', 'fr-FR-RemyNeural - fr-FR (Male)',
+  'de-DE-KatjaNeural - de-DE (Female)', 'de-DE-KillianNeural - de-DE (Male)',
+  'it-IT-ElsaNeural - it-IT (Female)', 'ja-JP-NanamiNeural - ja-JP (Female)'
+];
+const LANG_NAMES = {
+  'pt-BR':'Português (Brasil)','pt-PT':'Português (Portugal)','en-US':'Inglês (EUA)','en-GB':'Inglês (Reino Unido)',
+  'es-ES':'Espanhol (Espanha)','es-MX':'Espanhol (México)','fr-FR':'Francês','de-DE':'Alemão','it-IT':'Italiano',
+  'ja-JP':'Japonês','zh-CN':'Chinês','hi-IN':'Híndi','ko-KR':'Coreano','ru-RU':'Russo','ar-SA':'Árabe','nl-NL':'Holandês'
+};
+function langLabel(loc){
+  if (LANG_NAMES[loc]) return LANG_NAMES[loc];
+  try {
+    const n = new Intl.DisplayNames(['pt-BR'], { type:'language' });
+    let s = n.of(loc.replace('-', '_')) || loc;
+    return s.charAt(0).toUpperCase() + s.slice(1) + ' (' + loc + ')';
+  } catch (e) { return loc; }
+}
+function parseNeuralLabel(label){
+  const m = String(label).match(/^(.*?)\s*-\s*([a-z]{2,3}-[A-Z]{2})\s*\((Female|Male)\)/i);
+  if (!m) return { label, locale:'outros', short:String(label).slice(0,24), gender:'' };
+  const code = m[1].trim();
+  const short = code.replace(/Neural$/,'').replace(/Multilingual$/,' Multi').split('-').pop();
+  return { label, locale:m[2], short, gender:/female/i.test(m[3]) ? 'Feminino' : 'Masculino' };
+}
+// velocidade 0.5–2x do controle => -50..+50% da nuvem
+function cloudRatePct(){ return Math.max(-50, Math.min(50, Math.round((parseFloat(rateInput.value) - 1) * 100))); }
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+async function gradioAudio(text, voiceLabel, ratePct, pitchHz, onStatus, cancelFlag){
+  const session = Math.random().toString(36).slice(2) + Date.now().toString(36);
+  if (cancelFlag) cancelFlag.session = session;
+  const data = [text, voiceLabel, Number(ratePct), Number(pitchHz)];
+  for (let a = 0; a < 3; a++){
+    if (cancelFlag && cancelFlag.cancel) throw new Error('cancelled');
+    try {
+      const j = await fetch(spaceOrigin + '/gradio_api/queue/join', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ data, event_data:null, fn_index:0, session_hash:session })
+      });
+      if (!j.ok) throw new Error('join http ' + j.status);
+      await j.json();
+      break;
+    } catch (e) {
+      if (a === 2) throw new Error('Servidor de voz indisponível. Tente de novo em instantes.');
+      await sleep(1500);
+    }
+  }
+  const deadline = Date.now() + 240000;
+  while (Date.now() < deadline){
+    if (cancelFlag && cancelFlag.cancel) throw new Error('cancelled');
+    let r;
+    try { r = await fetch(spaceOrigin + '/gradio_api/queue/data?session_hash=' + session); }
+    catch (e) { await sleep(2000); continue; }
+    if (!r.ok || !r.body) { await sleep(2000); continue; }
+    const reader = r.body.getReader();
+    const dec = new TextDecoder();
+    let buf = '', finished = null, failed = null;
+    try {
+      for (;;){
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += dec.decode(value, { stream:true });
+        const parts = buf.split('\n\n'); buf = parts.pop();
+        for (const p of parts){
+          const ev = ((p.match(/event:\s*(\S+)/) || [])[1]) || 'message';
+          const dm = p.match(/data:\s*([\s\S]*)/);
+          if (!dm) continue;
+          let payload = null;
+          try { payload = JSON.parse(dm[1]); } catch (e) { continue; }
+          if (ev === 'complete'){ finished = payload; break; }
+          if (ev === 'error' || payload.success === false){
+            failed = (payload.output && payload.output.error) || payload.message || dm[1].slice(0, 200);
+            break;
+          }
+          if (payload.msg === 'process_completed' && payload.output && payload.output.data){
+            finished = payload.output.data; break;
+          }
+          if (payload.msg === 'estimation' && onStatus) onStatus({ queue:true, rank:payload.rank, eta:payload.rank_eta });
+          else if (payload.msg === 'process_starts' && onStatus) onStatus({ started:true });
+        }
+        if (finished || failed || (cancelFlag && cancelFlag.cancel)) break;
+      }
+    } finally { try { reader.cancel(); } catch (e) {} }
+    if (finished) return finished;
+    if (failed) throw new Error('Motor de voz: ' + failed);
+    await sleep(1500);
+  }
+  throw new Error('Tempo esgotado na fila. Tente um texto menor ou aguarde.');
+}
+
+async function fetchAudioBlob(file){
+  let url = file.url || '';
+  if (!url && file.path) url = '/gradio_api/file=' + file.path;
+  if (!/^https?:\/\//i.test(url)) url = spaceOrigin + (url.startsWith('/') ? '' : '/') + url;
+  const r = await fetch(url);
+  if (!r.ok) throw new Error('falha ao baixar áudio (' + r.status + ')');
+  const b = await r.arrayBuffer();
+  if (!b.byteLength) throw new Error('áudio vazio');
+  return new Blob([b], { type:'audio/mpeg' });
+}
+
+function currentVoiceLabel(){
+  return voiceSelect.value || NEURAL_LABELS[0] || FALLBACK_NEURAL[0];
+}
+async function synthLine(text){
+  const out = await gradioAudio(text, currentVoiceLabel(), cloudRatePct(), 0, null, null);
+  const file = out && out[0];
+  if (!file || (!file.url && !file.path)) throw new Error('resposta inesperada do servidor');
+  return fetchAudioBlob(file);
+}
+
+/* ================= IndexedDB ================= */
+function openDB() {
+  return new Promise((resolve, reject) => {
+    if (!('indexedDB' in window)) { reject(new Error('IndexedDB indisponível')); return; }
+    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE);
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror   = () => reject(req.error);
+  });
+}
+async function idbPut(key, value) {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE, 'readwrite');
+    tx.objectStore(STORE).put(value, key);
+    tx.oncomplete = () => { db.close(); resolve(); };
+    tx.onerror    = () => { db.close(); reject(tx.error); };
+  });
+}
+async function idbGet(key) {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE, 'readonly');
+    const req = tx.objectStore(STORE).get(key);
+    req.onsuccess = () => { db.close(); resolve(req.result); };
+    req.onerror   = () => { db.close(); reject(req.error); };
+  });
+}
+async function idbDelete(key) {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE, 'readwrite');
+    tx.objectStore(STORE).delete(key);
+    tx.oncomplete = () => { db.close(); resolve(); };
+    tx.onerror    = () => { db.close(); reject(tx.error); };
+  });
+}
+async function idbClear() {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE, 'readwrite');
+    tx.objectStore(STORE).clear();
+    tx.oncomplete = () => { db.close(); resolve(); };
+    tx.onerror    = () => { db.close(); reject(tx.error); };
+  });
+}
+
+function readSavedState() {
+  try { return JSON.parse(localStorage.getItem(LS_KEY)) || {}; }
+  catch (e) { return {}; }
+}
+function persistState() {
+  try {
+    const state = {
+      voiceLabel:  currentVoiceLabel(),
+      voiceLocale: voiceLang.value || '',
+      rate:         rateInput.value,
+      videoVolume:  videoVolume.value,
+      voiceVolume:  voiceVolume.value,
+      ducking:      duckingCheck.checked,
+      duckLevel:    duckLevel.value,
+      videoName:    videoName,
+      srtName:      srtName,
+      time:         videoPlayer.currentTime || 0
+    };
+    localStorage.setItem(LS_KEY, JSON.stringify(state));
+  } catch (e) { console.warn('Não foi possível salvar o estado:', e); }
+}
+
+function askConfirm(title, message, okLabel = 'Sim, apagar') {
+  return new Promise((resolve) => {
+    confirmTitle.textContent   = title;
+    confirmMessage.textContent = message;
+    confirmOk.textContent      = okLabel;
+    confirmOverlay.hidden      = false;
+    const cleanup = () => {
+      confirmOverlay.hidden = true;
+      confirmOk.removeEventListener('click', onOk);
+      confirmCancel.removeEventListener('click', onCancel);
+      confirmOverlay.removeEventListener('click', onOverlay);
+    };
+    const onOk      = () => { cleanup(); resolve(true);  };
+    const onCancel  = () => { cleanup(); resolve(false); };
+    const onOverlay = (e) => {
+      if (e.target === confirmOverlay) { cleanup(); resolve(false); }
+    };
+    confirmOk.addEventListener('click', onOk);
+    confirmCancel.addEventListener('click', onCancel);
+    confirmOverlay.addEventListener('click', onOverlay);
+  });
+}
+
+function initAudioContext() {
+  if (audioInitialized) return;
+  try {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  } catch (e) {
+    console.warn('Web Audio API não disponível:', e);
+    audioInitialized = false;
+    return;
+  }
+  try {
+    videoSource = audioCtx.createMediaElementSource(videoPlayer);
+    videoGain = audioCtx.createGain();
+    videoSource.connect(videoGain);
+    videoGain.connect(audioCtx.destination);
+    videoGain.gain.value = videoVolume.value / 100;
+  } catch (e) {
+    console.warn('Áudio do vídeo seguirá no volume nativo:', e);
+    videoSource = null;
+    videoGain = null;
+  }
+  try {
+    voiceGain = audioCtx.createGain();
+    voiceGain.gain.value = voiceVolume.value / 100;
+    voiceGain.connect(audioCtx.destination);
+  } catch (e) {
+    console.warn('Ganho da voz indisponível:', e);
+    voiceGain = null;
+  }
+  audioInitialized = true;
+}
+function resumeAudioContext() {
+  if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+}
+function setVideoGain(value01) {
+  if (videoGain) videoGain.gain.value = value01;
+  else { try { videoPlayer.volume = value01; } catch (e) {} }
+}
+function setVoiceGain(value01) {
+  if (voiceGain) voiceGain.gain.value = value01;
+}
+function stopNeuralLine() {
+  if (currentSource) {
+    try { currentSource.onended = null; currentSource.stop(); } catch (e) {}
+    currentSource = null;
+  }
+}
+
+/* ---------- lista de vozes neurais ---------- */
+function buildNeuralLangOptions(){
+  const locales = [...new Set(NEURAL_LABELS.map(v => parseNeuralLabel(v).locale))].sort((a, b) => {
+    if (a === 'pt-BR') return -1; if (b === 'pt-BR') return 1;
+    if (a.startsWith('pt')) return -1; if (b.startsWith('pt')) return 1;
+    return langLabel(a).localeCompare(langLabel(b));
+  });
+  voiceLang.innerHTML = '';
+  for (const loc of locales){
+    const o = document.createElement('option');
+    o.value = loc; o.textContent = (loc === 'pt-BR' ? '⭐ ' : '') + langLabel(loc);
+    voiceLang.appendChild(o);
+  }
+  const saved = (readSavedState().voiceLocale || '');
+  voiceLang.value = locales.includes(saved) ? saved : (locales.includes('pt-BR') ? 'pt-BR' : locales[0]);
+  buildNeuralVoiceOptions();
+}
+function buildNeuralVoiceOptions(restoreSaved = true){
+  const loc = voiceLang.value;
+  const list = NEURAL_LABELS.map(parseNeuralLabel).filter(v => v.locale === loc);
+  voiceSelect.innerHTML = '';
+  for (const v of list){
+    const o = document.createElement('option');
+    o.value = v.label;
+    o.textContent = v.short + ' · ' + v.gender + (/francisca|antonio/i.test(v.short) ? ' ⭐' : '');
+    voiceSelect.appendChild(o);
+  }
+  const opts = [...voiceSelect.options].map(o => o.value);
+  const saved = restoreSaved ? (readSavedState().voiceLabel || '') : '';
+  if (saved && opts.includes(saved)) { voiceSelect.value = saved; return; }
+  const hit = ['pt-BR-FranciscaNeural', 'pt-BR-AntonioNeural', 'pt-BR-ThalitaMultilingualNeural']
+    .map(n => opts.find(v => v.startsWith(n))).find(Boolean)
+    || opts.find(v => /Francisca/i.test(v));
+  if (hit) voiceSelect.value = hit;
+}
+voiceLang.addEventListener('change', () => { buildNeuralVoiceOptions(false); persistState(); });
+
+async function loadNeuralVoices(){
+  statusEl.textContent = 'Carregando vozes neurais…';
+  try {
+    const r = await fetch(spaceOrigin + '/gradio_api/info');
+    if (!r.ok) throw new Error('http ' + r.status);
+    const info = await r.json();
+    const ep = info.named_endpoints && info.named_endpoints['/tts_interface'];
+    const vp = ep && ep.parameters.find(p => p.parameter_name === 'voice');
+    const en = vp && vp.type && vp.type.enum;
+    if (!en || !en.length) throw new Error('api diferente');
+    NEURAL_LABELS = en.filter(Boolean);
+    statusEl.textContent = `✅ ${NEURAL_LABELS.length} vozes neurais prontas.`;
+  } catch (e) {
+    NEURAL_LABELS = FALLBACK_NEURAL.slice();
+    statusEl.textContent = '✅ Vozes prontas (lista local).';
+  }
+  buildNeuralLangOptions();
+}
+
+/* ---------- vozes do aparelho (reserva / teste rápido) ---------- */
+function loadSysVoices() {
+  try {
+    sysVoices = synth.getVoices() || [];
+  } catch (e) { sysVoices = []; }
+}
+if (speechSynthesis.onvoiceschanged !== undefined) {
+  speechSynthesis.onvoiceschanged = loadSysVoices;
+}
+
+const savedState = readSavedState();
+if (savedState.rate)                      rateInput.value    = savedState.rate;
+if (savedState.videoVolume !== undefined) videoVolume.value  = savedState.videoVolume;
+if (savedState.voiceVolume !== undefined) voiceVolume.value  = savedState.voiceVolume;
+if (savedState.duckLevel   !== undefined) duckLevel.value    = savedState.duckLevel;
+if (savedState.ducking     !== undefined) duckingCheck.checked = !!savedState.ducking;
+videoName = savedState.videoName || '';
+srtName   = savedState.srtName   || '';
+rateVal.textContent     = rateInput.value;
+videoVolVal.textContent = videoVolume.value;
+voiceVolVal.textContent = voiceVolume.value;
+duckVal.textContent     = duckLevel.value;
+loadSysVoices();
+setTimeout(loadSysVoices, 300);
+setTimeout(loadSysVoices, 1200);
+
+rateInput.addEventListener('input', () => {
+  rateVal.textContent = rateInput.value;
+  dubCache.clear();
+  persistState();
+});
+videoVolume.addEventListener('input', () => {
+  videoVolVal.textContent = videoVolume.value;
+  setVideoGain(videoVolume.value / 100);
+  persistState();
+});
+voiceVolume.addEventListener('input', () => {
+  voiceVolVal.textContent = voiceVolume.value;
+  setVoiceGain(voiceVolume.value / 100);
+  persistState();
+});
+duckLevel.addEventListener('input', () => {
+  duckVal.textContent = duckLevel.value;
+  persistState();
+});
+duckingCheck.addEventListener('change', persistState);
+voiceSelect.addEventListener('change', () => { dubCache.clear(); persistState(); });
+
+videoFile.addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  initAudioContext();
+  resumeAudioContext();
+  videoName = file.name;
+  if (videoObjectURL) { URL.revokeObjectURL(videoObjectURL); videoObjectURL = null; }
+  videoObjectURL = URL.createObjectURL(file);
+  videoPlayer.src = videoObjectURL;
+  videoPlayer.load();
+  setVideoGain(videoVolume.value / 100);
+  persistState();
+  statusEl.textContent = '💾 Salvando vídeo...';
+  try {
+    await idbPut('video', file);
+    statusEl.textContent = `✅ Vídeo salvo (${file.name}).`;
+  } catch (err) {
+    console.error(err);
+    statusEl.textContent = '⚠️ Não foi possível salvar o vídeo (arquivo muito grande?).';
+  }
+});
+
+srtFile.addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  srtName = file.name;
+  const reader = new FileReader();
+  reader.onload = async function (evt) {
+    const text = evt.target.result;
+    subtitles = parseSubtitles(text);
+    lastSubtitleIndex = -1;
+    dubCache.clear();
+    dlDubBtn.disabled = true;
+    statusEl.textContent = `✅ ${subtitles.length} linhas de legenda carregadas.`;
+    persistState();
+    srtEditorState.history = [];
+    srtEditorState.editingIndex = -1;
+    srtEditorState.editingBuffer = null;
+    srtEditorState.filter = '';
+    srtSearch.value = '';
+    lastHighlightedSubIndex = -1;
+    showSrtEditorPanel();
+    renderSrtEditor();
+    try {
+      await idbPut('srt', file);
+      await idbPut('subtitles', subtitles);
+    } catch (err) {
+      console.error(err);
+      statusEl.textContent += ' (⚠️ legenda não pôde ser salva)';
+    }
+  };
+  reader.readAsText(file);
+});
+
+function parseSubtitles(data) {
+  let text = String(data)
+    .replace(/^\uFEFF/, '')
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n');
+  const blocks = text.split(/\n{2,}/);
+  const timeRe = /(\d{1,2}):(\d{2}):(\d{2})[.,](\d{1,3})\s*-->\s*(\d{1,2}):(\d{2}):(\d{2})[.,](\d{1,3})/;
+  const subs = [];
+  for (const block of blocks) {
+    const lines = block.split('\n').filter(l => l.trim() !== '');
+    if (!lines.length) continue;
+    const timeLineIdx = lines.findIndex(l => timeRe.test(l));
+    if (timeLineIdx === -1) continue;
+    const m = lines[timeLineIdx].match(timeRe);
+    const start =
+      parseInt(m[1], 10) * 3600 + parseInt(m[2], 10) * 60 + parseInt(m[3], 10) +
+      parseInt(m[4].padEnd(3, '0'), 10) / 1000;
+    const end =
+      parseInt(m[5], 10) * 3600 + parseInt(m[6], 10) * 60 + parseInt(m[7], 10) +
+      parseInt(m[8].padEnd(3, '0'), 10) / 1000;
+    const txt = lines.slice(timeLineIdx + 1)
+      .join(' ')
+      .replace(/<[^>]*>/g, '')
+      .replace(/\{[^}]*\}/g, '')
+      .trim();
+    if (txt) subs.push({
+      startTime: start, endTime: end, text: txt,
+      origStartTime: start, origEndTime: end
+    });
+  }
+  subs.sort((a, b) => a.startTime - b.startTime);
+  return subs;
+}
+
+/* ---------- narração em tempo real ---------- */
+let lastPersistAt = 0;
+videoPlayer.addEventListener('timeupdate', () => {
+  if (videoPlayer.paused) return;
+  const currentTime = videoPlayer.currentTime;
+  const activeSubIndex = subtitles.findIndex(
+    sub => currentTime >= sub.startTime && currentTime <= sub.endTime
+  );
+  if (activeSubIndex !== -1 && activeSubIndex !== lastSubtitleIndex) {
+    lastSubtitleIndex = activeSubIndex;
+    narrarTexto(subtitles[activeSubIndex].text);
+  }
+  if (activeSubIndex === -1 && duckingCheck.checked) {
+    setVideoGain(videoVolume.value / 100);
+  }
+  if (Date.now() - lastPersistAt > 3000) {
+    lastPersistAt = Date.now();
+    persistState();
+  }
+  updateSrtHighlight();
+});
+
+videoPlayer.addEventListener('seeked', () => {
+  stopNeuralLine();
+  try { synth.cancel(); } catch (e) {}
+  lastSubtitleIndex = -1;
+  updateSrtHighlight();
+});
+videoPlayer.addEventListener('pause', () => { stopNeuralLine(); });
+videoPlayer.addEventListener('play', () => updateSrtHighlight());
+
+async function playCachedBuffer(key) {
+  const blob = dubCache.get(key);
+  if (!blob) return false;
+  try {
+    initAudioContext();
+    resumeAudioContext();
+    const ab = await blob.arrayBuffer();
+    const buf = await audioCtx.decodeAudioData(ab.slice(0));
+    stopNeuralLine();
+    if (duckingCheck.checked) setVideoGain(duckLevel.value / 100);
+    const src = audioCtx.createBufferSource();
+    src.buffer = buf;
+    src.connect(voiceGain || audioCtx.destination);
+    src.onended = () => {
+      if (currentSource === src) {
+        currentSource = null;
+        if (duckingCheck.checked) setVideoGain(videoVolume.value / 100);
+      }
+    };
+    currentSource = src;
+    src.start();
+    return true;
+  } catch (e) { console.warn('falha ao tocar fala neural:', e); return false; }
+}
+
+function lineKey(text) {
+  return 'audio|' + currentVoiceLabel() + '|' + cloudRatePct() + '|' + text;
+}
+
+async function narrarTexto(texto) {
+  if (!texto || texto.trim() === '') return;
+  const key = lineKey(texto);
+  if (dubCache.has(key)) {
+    const ok = await playCachedBuffer(key);
+    if (ok) return;
+  }
+  // reserva instantânea: voz do aparelho (a neural chega na pré-geração)
+  synth.cancel();
+  stopNeuralLine();
+  if (duckingCheck.checked) setVideoGain(duckLevel.value / 100);
+  const utterance = new SpeechSynthesisUtterance(texto);
+  try {
+    const loc = (voiceLang.value || 'pt-BR');
+    const vs = (sysVoices || []).filter(v => v.lang && v.lang.toLowerCase().startsWith(loc.slice(0, 2).toLowerCase()));
+    const best = vs.find(v => v.lang === loc) || vs[0];
+    if (best) utterance.voice = best;
+  } catch (e) {}
+  utterance.rate   = parseFloat(rateInput.value);
+  utterance.volume = voiceVolume.value / 100;
+  const restore = () => {
+    if (duckingCheck.checked) setVideoGain(videoVolume.value / 100);
+    currentUtterance = null;
+  };
+  utterance.onend   = restore;
+  utterance.onerror = restore;
+  currentUtterance = utterance;
+  synth.speak(utterance);
+}
+
+testVoiceBtn.addEventListener('click', async () => {
+  resumeAudioContext();
+  testVoiceBtn.disabled = true;
+  const old = testVoiceBtn.textContent;
+  testVoiceBtn.textContent = '⏳ Gerando...';
+  try {
+    const blob = await synthLine('Esta é uma amostra da voz narrativa neural.');
+    const url = URL.createObjectURL(blob);
+    new Audio(url).play().catch(() => {});
+    setTimeout(() => URL.revokeObjectURL(url), 30000);
+    statusEl.textContent = '✅ Amostra neural tocando.';
+  } catch (e) {
+    statusEl.textContent = '⚠️ Nuvem ocupada (' + e.message + '). Testando voz do aparelho…';
+    try {
+      const utterance = new SpeechSynthesisUtterance('Esta é uma amostra da voz do aparelho.');
+      utterance.rate = parseFloat(rateInput.value);
+      synth.cancel();
+      synth.speak(utterance);
+    } catch (e2) {}
+  }
+  testVoiceBtn.textContent = old;
+  testVoiceBtn.disabled = false;
+});
+
+/* ---------- cache das falas (memória + IndexedDB) ---------- */
+const dubCache = new Map();
+async function getLineBlob(text) {
+  const key = lineKey(text);
+  if (dubCache.has(key)) return dubCache.get(key);
+  try {
+    const saved = await idbGet(key);
+    if (saved instanceof Blob && saved.size > 0) { dubCache.set(key, saved); return saved; }
+  } catch (e) {}
+  const blob = await synthLine(text);
+  dubCache.set(key, blob);
+  try { await idbPut(key, blob); } catch (e) { console.warn('cache cheio, seguindo só com memória:', e); }
+  return blob;
+}
+
+/* ---------- pré-geração ---------- */
+let pregenFlag = null;
+pregenBtn.addEventListener('click', async () => {
+  if (!subtitles.length) { dubStatus.textContent = 'Carregue uma legenda primeiro.'; return; }
+  pregenFlag = { cancel:false };
+  pregenBtn.disabled = true;
+  pregenCancelBtn.disabled = false;
+  dubProgress.style.width = '0%';
+  let done = 0;
+  try {
+    for (let i = 0; i < subtitles.length; i++){
+      if (pregenFlag.cancel) throw new Error('cancelled');
+      const key = lineKey(subtitles[i].text);
+      if (!dubCache.has(key)) {
+        dubStatus.textContent = `Gerando ${i + 1}/${subtitles.length}: "${subtitles[i].text.slice(0, 40)}…"`;
+        await getLineBlob(subtitles[i].text);
+      }
+      done = i + 1;
+      dubProgress.style.width = Math.round((done / subtitles.length) * 100) + '%';
+    }
+    dubStatus.textContent = `✅ ${done} falas neurais prontas. Dê play no vídeo para dublar.`;
+  } catch (e) {
+    dubStatus.textContent = e.message === 'cancelled' ? 'Pré-geração cancelada.' : '⚠️ ' + e.message;
+  }
+  pregenBtn.disabled = false;
+  pregenCancelBtn.disabled = true;
+  pregenFlag = null;
+});
+pregenCancelBtn.addEventListener('click', () => { if (pregenFlag) pregenFlag.cancel = true; });
+
+/* ---------- exportar MP3 no ritmo do SRT ---------- */
+let exportFlag = null;
+let lastDubBlob = null;
+
+function ensureLameJs() {
+  return new Promise((resolve) => {
+    if (window.lamejs && window.lamejs.Mp3Encoder) { resolve(true); return; }
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/lamejs@1.2.1/lame.min.js';
+    const to = setTimeout(() => { s.remove(); resolve(false); }, 15000);
+    s.onload = () => { clearTimeout(to); resolve(!!(window.lamejs && window.lamejs.Mp3Encoder)); };
+    s.onerror = () => { clearTimeout(to); resolve(false); };
+    document.head.appendChild(s);
+  });
+}
+function encodeWav(float32, sampleRate) {
+  const n = float32.length;
+  const buf = new ArrayBuffer(44 + n * 2);
+  const v = new DataView(buf);
+  const wstr = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+  wstr(0, 'RIFF'); v.setUint32(4, 36 + n * 2, true); wstr(8, 'WAVE'); wstr(12, 'fmt ');
+  v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, sampleRate, true); v.setUint32(28, sampleRate * 2, true);
+  v.setUint16(32, 2, true); v.setUint16(34, 16, true); wstr(36, 'data');
+  v.setUint32(40, n * 2, true);
+  for (let i = 0; i < n; i++) {
+    const s = Math.max(-1, Math.min(1, float32[i]));
+    v.setInt16(44 + i * 2, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+  }
+  return new Blob([buf], { type:'audio/wav' });
+}
+function encodeMp3(float32, sampleRate) {
+  const enc = new lamejs.Mp3Encoder(1, sampleRate, 96);
+  const out = [];
+  const block = 1152;
+  for (let i = 0; i < float32.length; i += block) {
+    const chunk = float32.subarray(i, Math.min(float32.length, i + block));
+    const i16 = new Int16Array(chunk.length);
+    for (let j = 0; j < chunk.length; j++) {
+      const s = Math.max(-1, Math.min(1, chunk[j]));
+      i16[j] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+    }
+    const d = enc.encodeBuffer(i16);
+    if (d.length) out.push(new Uint8Array(d));
+  }
+  const end = enc.flush();
+  if (end.length) out.push(new Uint8Array(end));
+  return new Blob(out, { type:'audio/mpeg' });
+}
+
+exportBtn.addEventListener('click', async () => {
+  if (!subtitles.length) { exportStatus.textContent = 'Carregue uma legenda (.SRT) primeiro — nem precisa do vídeo.'; return; }
+  exportFlag = { cancel:false };
+  exportBtn.disabled = true;
+  exportCancelBtn.disabled = false;
+  dlDubBtn.disabled = true;
+  lastDubBlob = null;
+  fitList.hidden = true;
+  fitList.innerHTML = '';
+  exportProgress.style.width = '0%';
+  const SR = 24000, MAX_RATE = 1.6;
+  try {
+    // 1) garante todas as falas
+    const items = [];
+    for (let i = 0; i < subtitles.length; i++){
+      if (exportFlag.cancel) throw new Error('cancelled');
+      exportStatus.textContent = `Voz ${i + 1}/${subtitles.length}…`;
+      const blob = await getLineBlob(subtitles[i].text);
+      items.push({ sub:subtitles[i], blob });
+      exportProgress.style.width = Math.round(((i + 1) / subtitles.length) * 50) + '%';
+    }
+    // 2) monta a linha do tempo
+    exportStatus.textContent = 'Montando a faixa no ritmo do SRT…';
+    const lastEnd = subtitles[subtitles.length - 1].endTime;
+    const totalDur = lastEnd + 1.0;
+    const off = new OfflineAudioContext(1, Math.max(1, Math.ceil(totalDur * SR)), SR);
+    const fitMsgs = [];
+    for (let i = 0; i < items.length; i++){
+      if (exportFlag.cancel) throw new Error('cancelled');
+      const { sub, blob } = items[i];
+      const ab = await blob.arrayBuffer();
+      const buf = await off.decodeAudioData(ab.slice(0));
+      const slot = Math.max(0.3, sub.endTime - sub.startTime);
+      let rate = 1, flag = '';
+      if (buf.duration > slot) {
+        rate = Math.min(buf.duration / slot, MAX_RATE);
+        const placed = buf.duration / rate;
+        if (placed > slot + 0.05) flag = `estourou +${(placed - slot).toFixed(2)}s`;
+        else flag = `acelerada ${rate.toFixed(2)}x`;
+      }
+      const src = off.createBufferSource();
+      src.buffer = buf;
+      src.playbackRate.value = rate;
+      src.connect(off.destination);
+      src.start(Math.max(0, sub.startTime));
+      fitMsgs.push({ i:i + 1, slot, dur:buf.duration, rate, flag });
+      exportProgress.style.width = (50 + Math.round(((i + 1) / items.length) * 40)) + '%';
+    }
+    const master = await off.startRendering();
+    const ch = master.getChannelData(0);
+    // 3) MP3 (ou WAV se o codificador não carregar)
+    exportStatus.textContent = 'Codificando o arquivo…';
+    let blob, ext;
+    if (await ensureLameJs()) { blob = encodeMp3(ch, SR); ext = 'mp3'; }
+    else { blob = encodeWav(ch, SR); ext = 'wav'; }
+    lastDubBlob = blob;
+    const base = (srtName || 'dublado').replace(/\.(srt|vtt)$/i, '');
+    dlDubBtn.disabled = false;
+    dlDubBtn.textContent = '⬇ Baixar ' + ext.toUpperCase();
+    dlDubBtn.onclick = () => {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = base + '_dublado.' + ext;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+    };
+    const over = fitMsgs.filter(f => f.flag.startsWith('estourou'));
+    const fast = fitMsgs.filter(f => f.flag.startsWith('acelerada'));
+    exportStatus.textContent = `✅ Pronto: ${(master.duration).toFixed(1)}s de áudio em ${fitMsgs.length} falas. ` +
+      (over.length ? `${over.length} estouraram o tempo (veja abaixo). ` : 'Todas couberam no tempo. ') +
+      (ext === 'wav' ? 'Codificador MP3 indisponível: baixou em WAV (mesmo áudio).' : 'Aperte Baixar MP3.');
+    fitList.hidden = false;
+    fitList.innerHTML = fitMsgs
+      .filter(f => f.flag)
+      .slice(0, 60)
+      .map(f => `<li class="${f.flag.startsWith('estourou') ? 'bad' : 'warn'}">#${f.i}: fala de ${f.dur.toFixed(1)}s no espaço de ${f.slot.toFixed(1)}s — ${f.flag}</li>`)
+      .join('') || '<li>Todas as falas couberam no tempo original. 👌</li>';
+    exportProgress.style.width = '100%';
+  } catch (e) {
+    exportStatus.textContent = e.message === 'cancelled' ? 'Exportação cancelada.' : '⚠️ ' + e.message;
+  }
+  exportBtn.disabled = false;
+  exportCancelBtn.disabled = true;
+  exportFlag = null;
+});
+exportCancelBtn.addEventListener('click', () => { if (exportFlag) exportFlag.cancel = true; });
+
+/* ---------- limpeza ---------- */
+clearVideoBtn.addEventListener('click', async () => {
+  const ok = await askConfirm('Limpar vídeo?', 'O vídeo salvo será removido deste aparelho. As legendas e preferências continuam.', 'Sim, limpar vídeo');
+  if (!ok) return;
+  try { await idbDelete('video'); } catch (e) { console.warn(e); }
+  if (videoObjectURL) { URL.revokeObjectURL(videoObjectURL); videoObjectURL = null; }
+  videoPlayer.removeAttribute('src');
+  videoPlayer.load();
+  videoName = '';
+  persistState();
+  statusEl.textContent = '🎬 Vídeo removido.';
+});
+
+clearSrtBtn.addEventListener('click', async () => {
+  const ok = await askConfirm('Limpar legenda?', 'A legenda salva será removida deste aparelho. O vídeo e as preferências continuam.', 'Sim, limpar legenda');
+  if (!ok) return;
+  try { await idbDelete('srt'); }       catch (e) { console.warn(e); }
+  try { await idbDelete('subtitles'); } catch (e) { console.warn(e); }
+  subtitles = [];
+  lastSubtitleIndex = -1;
+  dubCache.clear();
+  dlDubBtn.disabled = true;
+  srtName = '';
+  hideSrtEditorPanel();
+  srtEditorState.history = [];
+  srtEditorState.editingIndex = -1;
+  srtEditorState.editingBuffer = null;
+  srtEditorState.filter = '';
+  srtSearch.value = '';
+  lastHighlightedSubIndex = -1;
+  persistState();
+  statusEl.textContent = '📝 Legenda removida.';
+});
+
+clearDataBtn.addEventListener('click', async () => {
+  const ok = await askConfirm('Limpar TUDO?', 'Isso apaga vídeo, legenda, vozes geradas, posição e todas as preferências salvas neste aparelho. Não tem como desfazer.', 'Sim, apagar tudo');
+  if (!ok) return;
+  localStorage.removeItem(LS_KEY);
+  try { await idbClear(); } catch (e) { console.warn(e); }
+  if (videoObjectURL) { URL.revokeObjectURL(videoObjectURL); videoObjectURL = null; }
+  subtitles = [];
+  lastSubtitleIndex = -1;
+  dubCache.clear();
+  dlDubBtn.disabled = true;
+  videoName = '';
+  srtName = '';
+  videoPlayer.removeAttribute('src');
+  videoPlayer.load();
+  hideSrtEditorPanel();
+  srtEditorState.history = [];
+  srtEditorState.editingIndex = -1;
+  srtEditorState.editingBuffer = null;
+  srtEditorState.filter = '';
+  srtSearch.value = '';
+  lastHighlightedSubIndex = -1;
+  statusEl.textContent = '🗑️ Todos os dados salvos foram apagados.';
+});
+
+async function restoreFiles() {
+  let videoBlob = null, srtBlob = null, savedSubs = null;
+  try {
+    videoBlob = await idbGet('video');
+    srtBlob   = await idbGet('srt');
+    savedSubs = await idbGet('subtitles');
+  } catch (e) {
+    console.warn('Falha ao ler do IndexedDB:', e);
+    return;
+  }
+  const hasSavedSubs = Array.isArray(savedSubs) && savedSubs.length > 0;
+  if (!videoBlob && !srtBlob && !hasSavedSubs) {
+    statusEl.textContent = 'Nenhuma legenda carregada.';
+    return;
+  }
+  if (hasSavedSubs || srtBlob) {
+    try {
+      if (hasSavedSubs) {
+        subtitles = savedSubs.map(s => ({
+          ...s,
+          origStartTime: s.origStartTime !== undefined ? s.origStartTime : s.startTime,
+          origEndTime:   s.origEndTime   !== undefined ? s.origEndTime   : s.endTime
+        }));
+      } else {
+        const text = await srtBlob.text();
+        subtitles = parseSubtitles(text);
+      }
+      lastSubtitleIndex = -1;
+      statusEl.textContent = `♻️ Legenda restaurada: ${subtitles.length} linhas (${srtName || 'arquivo salvo'}).`;
+      showSrtEditorPanel();
+      renderSrtEditor();
+    } catch (e) { console.warn(e); }
+  }
+  if (videoBlob) {
+    if (videoObjectURL) URL.revokeObjectURL(videoObjectURL);
+    videoObjectURL = URL.createObjectURL(videoBlob);
+    videoPlayer.src = videoObjectURL;
+    const savedTime = savedState.time || 0;
+    const seekOnce = () => {
+      videoPlayer.removeEventListener('loadedmetadata', seekOnce);
+      if (savedTime > 0 && isFinite(savedTime)) {
+        try { videoPlayer.currentTime = savedTime; lastPersistAt = Date.now(); }
+        catch (e) { console.warn('Não foi possível restaurar a posição:', e); }
+      }
+      setVideoGain(videoVolume.value / 100);
+    };
+    videoPlayer.addEventListener('loadedmetadata', seekOnce);
+    statusEl.textContent = `♻️ Vídeo restaurado (${videoName || 'arquivo salvo'}). Toque em ▶️ para continuar de onde parou.`;
+  }
+}
+
+document.body.addEventListener('click', () => {
+  initAudioContext();
+  resumeAudioContext();
+  setVideoGain(videoVolume.value / 100);
+}, { once: true });
+
+videoPlayer.addEventListener('play', () => {
+  initAudioContext();
+  resumeAudioContext();
+  setVideoGain(videoVolume.value / 100);
+});
+videoPlayer.addEventListener('pause', persistState);
+videoPlayer.addEventListener('ended', persistState);
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') {
+    persistState();
+    if (subtitles.length) idbPut('subtitles', subtitles).catch(() => {});
+  }
+});
+window.addEventListener('pagehide', () => {
+  persistState();
+  if (subtitles.length) idbPut('subtitles', subtitles).catch(() => {});
+});
+window.addEventListener('beforeunload', persistState);
+
+/* =========================================================
+   EDITOR DE LEGENDAS EM TEMPO REAL
+   ========================================================= */
+const srtEditorPanel    = document.getElementById('srtEditorPanel');
+const toggleSrtEditor   = document.getElementById('toggleSrtEditor');
+const srtToggleIcon     = document.getElementById('srtToggleIcon');
+const srtEditorBody     = document.getElementById('srtEditorBody');
+const srtEditorInfo     = document.getElementById('srtEditorInfo');
+const srtList           = document.getElementById('srtList');
+const srtSearch         = document.getElementById('srtSearch');
+const srtGlobalShiftIn  = document.getElementById('srtGlobalShift');
+const srtApplyGlobalBtn = document.getElementById('srtApplyGlobalShift');
+const srtFollowBtn      = document.getElementById('srtFollowPlayback');
+const srtUndoBtn        = document.getElementById('srtUndo');
+const srtRevertAllBtn   = document.getElementById('srtRevertAll');
+const srtExportBtn      = document.getElementById('srtExport');
+
+const srtEditorState = {
+  editingIndex: -1,
+  editingBuffer: null,
+  filter: '',
+  history: []
+};
+let lastHighlightedSubIndex = -1;
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => (
+    {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]
+  ));
+}
+function fmtTime(sec) {
+  sec = Math.max(0, Math.round(sec * 1000) / 1000);
+  const h  = Math.floor(sec / 3600);
+  const m  = Math.floor((sec % 3600) / 60);
+  const s  = Math.floor(sec % 60);
+  const ms = Math.round((sec - Math.floor(sec)) * 1000);
+  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')},${String(ms).padStart(3,'0')}`;
+}
+function parseFmtTime(str) {
+  str = String(str).trim().replace(',', '.');
+  let m = str.match(/^(\d+):(\d+):(\d+)(?:\.(\d+))?$/);
+  if (m) return (+m[1])*3600 + (+m[2])*60 + (+m[3]) + (+(m[4]||'0').padEnd(3,'0').slice(0,3))/1000;
+  m = str.match(/^(\d+):(\d+)(?:\.(\d+))?$/);
+  if (m) return (+m[1])*60 + (+m[2]) + (+(m[3]||'0').padEnd(3,'0').slice(0,3))/1000;
+  m = str.match(/^(\d+)(?:\.(\d+))?$/);
+  if (m) return (+m[1]) + (+(m[2]||'0').padEnd(3,'0').slice(0,3))/1000;
+  return null;
+}
+function fmtDelta(sec) {
+  const sign = sec < 0 ? '-' : '+';
+  const abs = Math.abs(sec);
+  if (abs < 1) return `${sign}${(abs * 1000).toFixed(0)}ms`;
+  return `${sign}${abs.toFixed(2)}s`;
+}
+
+function scheduleSaveSubtitles() {
+  clearTimeout(scheduleSaveSubtitles._t);
+  scheduleSaveSubtitles._t = setTimeout(async () => {
+    try { await idbPut('subtitles', subtitles); } catch (e) { console.warn(e); }
+  }, 400);
+}
+
+function showSrtEditorPanel() {
+  srtEditorPanel.hidden = false;
+  updateSrtEditorInfo();
+}
+function hideSrtEditorPanel() {
+  srtEditorPanel.hidden = true;
+  srtEditorBody.hidden = true;
+  srtToggleIcon.classList.remove('open');
+}
+function updateSrtEditorInfo() {
+  if (!subtitles.length) { srtEditorInfo.textContent = 'nenhuma legenda'; return; }
+  let mod = 0;
+  for (const s of subtitles) {
+    if (s.startTime !== s.origStartTime || s.endTime !== s.origEndTime) mod++;
+  }
+  srtEditorInfo.textContent = `${subtitles.length} legendas` + (mod ? ` · ${mod} alterada(s)` : '');
+}
+
+function getFilteredSubIndices() {
+  const q = srtEditorState.filter.trim().toLowerCase();
+  if (!q) return subtitles.map((_, i) => i);
+  return subtitles.map((s, i) => ({ s, i }))
+    .filter(({ s }) =>
+      s.text.toLowerCase().includes(q) ||
+      fmtTime(s.startTime).toLowerCase().includes(q) ||
+      fmtTime(s.endTime).toLowerCase().includes(q)
+    ).map(({ i }) => i);
+}
+
+function renderSrtEditor() {
+  updateSrtEditorInfo();
+  updateSrtUndoBtn();
+  const scrollTop = srtList.scrollTop;
+  if (!subtitles.length) {
+    srtList.innerHTML = '<div class="srt-empty">Carregue um arquivo .SRT para editar as legendas.</div>';
+    return;
+  }
+  const filtered = getFilteredSubIndices();
+  if (!filtered.length) {
+    srtList.innerHTML = `<div class="srt-empty">Nenhum resultado para "${escapeHtml(srtEditorState.filter)}"</div>`;
+    return;
+  }
+  const frag = document.createDocumentFragment();
+  filtered.forEach(i => {
+    const sub = subtitles[i];
+    const modified = sub.startTime !== sub.origStartTime || sub.endTime !== sub.origEndTime;
+    const isEditing = srtEditorState.editingIndex === i;
+    const dur = sub.endTime - sub.startTime;
+    const row = document.createElement('div');
+    row.className = 'srt-item'
+      + (modified ? ' modified' : '')
+      + (isEditing ? ' editing' : '');
+    row.dataset.index = i;
+    row.innerHTML = `
+      <div class="srt-item-header">
+        <button type="button" class="srt-seek" data-index="${i}" title="Ir para este tempo">▶</button>
+        <span class="srt-num">#${i + 1}</span>
+        <span class="srt-time">${fmtTime(sub.startTime)} → ${fmtTime(sub.endTime)}</span>
+        <span class="srt-dur">(${dur.toFixed(2)}s)</span>
+        ${modified ? '<span class="srt-badge">alterado</span>' : ''}
+      </div>
+      <div class="srt-text">${escapeHtml(sub.text) || '<span style="color:#5c6274">(vazio)</span>'}</div>
+    `;
+    if (isEditing) row.appendChild(createSrtInlineEditor(i));
+    frag.appendChild(row);
+  });
+  srtList.innerHTML = '';
+  srtList.appendChild(frag);
+  srtList.scrollTop = scrollTop;
+  lastHighlightedSubIndex = -1;
+  updateSrtHighlight();
+}
+
+function createSrtInlineEditor(i) {
+  const sub = subtitles[i];
+  const buf = srtEditorState.editingBuffer;
+  const el = document.createElement('div');
+  el.className = 'srt-inline-editor';
+  el.addEventListener('click', e => e.stopPropagation());
+  el.innerHTML = `
+    <div class="srt-time-row">
+      <label>Início</label>
+      <input class="srt-time-input" data-field="start" value="${fmtTime(buf.startTime)}" spellcheck="false">
+      <button type="button" class="srt-shift-btn" data-shift="-1">−1s</button>
+      <button type="button" class="srt-shift-btn" data-shift="-0.1">−0.1s</button>
+      <button type="button" class="srt-shift-btn" data-shift="0.1">+0.1s</button>
+      <button type="button" class="srt-shift-btn" data-shift="1">+1s</button>
+    </div>
+    <div class="srt-time-row">
+      <label>Fim</label>
+      <input class="srt-time-input" data-field="end" value="${fmtTime(buf.endTime)}" spellcheck="false">
+      <span class="srt-delta zero" data-delta>0</span>
+    </div>
+    <div class="srt-editor-actions">
+      <button type="button" class="btn" data-action="reset">↺ Restaurar</button>
+      <button type="button" class="btn" data-action="this">Só este</button>
+      <button type="button" class="btn btn-primary" data-action="forward">Este e os seguintes →</button>
+      <button type="button" class="btn" data-action="chain" title="Cola as seguintes emendadas, sem gaps">🔗 Encadear seguintes</button>
+      <button type="button" class="btn" data-action="all">Em todos</button>
+    </div>`;
+
+  const startInput = el.querySelector('[data-field="start"]');
+  const endInput   = el.querySelector('[data-field="end"]');
+
+  function refresh() {
+    startInput.value = fmtTime(buf.startTime);
+    endInput.value   = fmtTime(buf.endTime);
+    const d = buf.startTime - sub.origStartTime;
+    const dd = el.querySelector('[data-delta]');
+    if (Math.abs(d) < 0.0005) {
+      dd.textContent = 'sem alteração';
+      dd.className = 'srt-delta zero';
+    } else {
+      dd.textContent = fmtDelta(d);
+      dd.className = 'srt-delta' + (d < 0 ? ' neg' : '');
+    }
+  }
+  function readStart() {
+    const v = parseFmtTime(startInput.value);
+    if (v === null) { startInput.value = fmtTime(buf.startTime); return; }
+    const dur = buf.endTime - buf.startTime;
+    buf.startTime = Math.max(0, v);
+    buf.endTime = buf.startTime + dur;
+    refresh();
+  }
+  function readEnd() {
+    const v = parseFmtTime(endInput.value);
+    if (v === null) { endInput.value = fmtTime(buf.endTime); return; }
+    buf.endTime = v <= buf.startTime ? buf.startTime + 0.1 : v;
+    refresh();
+  }
+  startInput.addEventListener('change', readStart);
+  startInput.addEventListener('blur',   readStart);
+  endInput.addEventListener('change',   readEnd);
+  endInput.addEventListener('blur',     readEnd);
+
+  [startInput, endInput].forEach(inp => inp.addEventListener('keydown', e => {
+    if (e.key === 'Enter')  { e.preventDefault(); inp.blur(); }
+    if (e.key === 'Escape') { e.preventDefault(); closeSrtInlineEditor(); }
+  }));
+
+  el.querySelectorAll('[data-shift]').forEach(btn => btn.addEventListener('click', () => {
+    const delta = parseFloat(btn.dataset.shift);
+    buf.startTime = Math.max(0, buf.startTime + delta);
+    buf.endTime   = Math.max(buf.startTime + 0.1, buf.endTime + delta);
+    refresh();
+  }));
+
+  el.querySelector('[data-action="reset"]').addEventListener('click', () => {
+    buf.startTime = sub.origStartTime;
+    buf.endTime   = sub.origEndTime;
+    refresh();
+  });
+  el.querySelector('[data-action="this"]').addEventListener('click', () => applySrtThis(i));
+  el.querySelector('[data-action="forward"]').addEventListener('click', () => applySrtForward(i));
+  el.querySelector('[data-action="chain"]').addEventListener('click', () => applySrtChain(i));
+  el.querySelector('[data-action="all"]').addEventListener('click', () => applySrtAll(i));
+
+  refresh();
+  return el;
+}
+
+function closeSrtInlineEditor() {
+  srtEditorState.editingIndex = -1;
+  srtEditorState.editingBuffer = null;
+  renderSrtEditor();
+}
+
+function pushSrtHistory() {
+  srtEditorState.history.push(subtitles.map(s => ({ ...s })));
+  if (srtEditorState.history.length > 30) srtEditorState.history.shift();
+  updateSrtUndoBtn();
+}
+function updateSrtUndoBtn() {
+  srtUndoBtn.disabled      = srtEditorState.history.length === 0;
+  srtRevertAllBtn.disabled = !subtitles.length;
+}
+
+function applySrtThis(i) {
+  const buf = srtEditorState.editingBuffer;
+  if (!buf) return;
+  pushSrtHistory();
+  subtitles[i].startTime = Math.max(0, buf.startTime);
+  subtitles[i].endTime   = Math.max(subtitles[i].startTime + 0.1, buf.endTime);
+  dubCache.clear();
+  lastSubtitleIndex = -1;
+  closeSrtInlineEditor();
+  scheduleSaveSubtitles();
+}
+
+function applySrtForward(i) {
+  const buf = srtEditorState.editingBuffer;
+  if (!buf) return;
+  pushSrtHistory();
+  const deltaStart = buf.startTime - subtitles[i].startTime;
+  subtitles[i].startTime = Math.max(0, buf.startTime);
+  subtitles[i].endTime   = Math.max(subtitles[i].startTime + 0.1, buf.endTime);
+  if (deltaStart !== 0) {
+    for (let j = i + 1; j < subtitles.length; j++) {
+      const s = subtitles[j];
+      const dur = s.endTime - s.startTime;
+      s.startTime = Math.max(0, s.startTime + deltaStart);
+      s.endTime   = s.startTime + dur;
+    }
+  }
+  for (let j = i + 1; j < subtitles.length; j++) {
+    const prev = subtitles[j - 1];
+    const curr = subtitles[j];
+    if (curr.startTime < prev.endTime) {
+      const dur = curr.endTime - curr.startTime;
+      curr.startTime = prev.endTime;
+      curr.endTime   = curr.startTime + dur;
+    } else {
+      break;
+    }
+  }
+  dubCache.clear();
+  lastSubtitleIndex = -1;
+  closeSrtInlineEditor();
+  scheduleSaveSubtitles();
+}
+
+function applySrtChain(i) {
+  const buf = srtEditorState.editingBuffer;
+  if (!buf) return;
+  pushSrtHistory();
+  subtitles[i].startTime = Math.max(0, buf.startTime);
+  subtitles[i].endTime   = Math.max(subtitles[i].startTime + 0.1, buf.endTime);
+  let cursor = subtitles[i].endTime;
+  for (let j = i + 1; j < subtitles.length; j++) {
+    const dur = subtitles[j].endTime - subtitles[j].startTime;
+    subtitles[j].startTime = cursor;
+    subtitles[j].endTime   = cursor + dur;
+    cursor = subtitles[j].endTime;
+  }
+  dubCache.clear();
+  lastSubtitleIndex = -1;
+  closeSrtInlineEditor();
+  scheduleSaveSubtitles();
+}
+
+function applySrtAll(i) {
+  const buf = srtEditorState.editingBuffer;
+  if (!buf) return;
+  pushSrtHistory();
+  const delta = buf.startTime - subtitles[i].startTime;
+  for (let j = 0; j < subtitles.length; j++) {
+    if (j === i) {
+      subtitles[j].startTime = Math.max(0, buf.startTime);
+      subtitles[j].endTime   = Math.max(subtitles[j].startTime + 0.1, buf.endTime);
+    } else if (delta !== 0) {
+      const s = subtitles[j];
+      const dur = s.endTime - s.startTime;
+      s.startTime = Math.max(0, s.startTime + delta);
+      s.endTime   = s.startTime + dur;
+    }
+  }
+  dubCache.clear();
+  lastSubtitleIndex = -1;
+  closeSrtInlineEditor();
+  scheduleSaveSubtitles();
+}
+
+function applySrtGlobalShift() {
+  const val = parseFloat(srtGlobalShiftIn.value);
+  if (!isFinite(val) || val === 0 || !subtitles.length) return;
+  pushSrtHistory();
+  for (const s of subtitles) {
+    const dur = s.endTime - s.startTime;
+    s.startTime = Math.max(0, s.startTime + val);
+    s.endTime   = s.startTime + dur;
+  }
+  dubCache.clear();
+  srtEditorState.editingIndex = -1;
+  srtEditorState.editingBuffer = null;
+  lastSubtitleIndex = -1;
+  renderSrtEditor();
+  scheduleSaveSubtitles();
+}
+
+function undoSrtEdit() {
+  if (!srtEditorState.history.length) return;
+  subtitles = srtEditorState.history.pop();
+  dubCache.clear();
+  srtEditorState.editingIndex = -1;
+  srtEditorState.editingBuffer = null;
+  lastSubtitleIndex = -1;
+  renderSrtEditor();
+  scheduleSaveSubtitles();
+}
+
+function revertAllSrtEdits() {
+  if (!subtitles.length) return;
+  pushSrtHistory();
+  for (const s of subtitles) {
+    s.startTime = s.origStartTime;
+    s.endTime   = s.origEndTime;
+  }
+  dubCache.clear();
+  srtEditorState.editingIndex = -1;
+  srtEditorState.editingBuffer = null;
+  lastSubtitleIndex = -1;
+  renderSrtEditor();
+  scheduleSaveSubtitles();
+}
+
+function seekToSub(i) {
+  const s = subtitles[i];
+  if (!s) return;
+  try { videoPlayer.currentTime = s.startTime; } catch (e) {}
+}
+
+function updateSrtHighlight() {
+  if (!srtEditorBody || srtEditorBody.hidden || !subtitles.length) return;
+  const t = videoPlayer.currentTime;
+  const idx = subtitles.findIndex(s => t >= s.startTime && t <= s.endTime);
+  if (idx === lastHighlightedSubIndex) return;
+  lastHighlightedSubIndex = idx;
+  const prev = srtList.querySelector('.srt-item.active');
+  if (prev) prev.classList.remove('active');
+  if (idx !== -1) {
+    const row = srtList.querySelector(`.srt-item[data-index="${idx}"]`);
+    if (row) row.classList.add('active');
+  }
+}
+
+function followCurrentSub() {
+  if (!subtitles.length) return;
+  if (srtEditorBody.hidden) {
+    srtEditorBody.hidden = false;
+    srtToggleIcon.classList.add('open');
+    renderSrtEditor();
+  }
+  const t = videoPlayer.currentTime;
+  let idx = subtitles.findIndex(s => t >= s.startTime && t <= s.endTime);
+  if (idx === -1) idx = subtitles.findIndex(s => s.startTime > t);
+  if (idx === -1) idx = subtitles.length - 1;
+  const filtered = getFilteredSubIndices();
+  if (!filtered.includes(idx)) {
+    srtEditorState.filter = '';
+    srtSearch.value = '';
+    renderSrtEditor();
+  }
+  const row = srtList.querySelector(`.srt-item[data-index="${idx}"]`);
+  if (row) {
+    row.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    row.classList.add('flash');
+    setTimeout(() => row.classList.remove('flash'), 1400);
+  }
+}
+
+function downloadSrt() {
+  if (!subtitles.length) return;
+  const srt = subtitles.map((s, i) =>
+    `${i + 1}\n${fmtTime(s.startTime)} --> ${fmtTime(s.endTime)}\n${s.text}`
+  ).join('\n\n') + '\n';
+  const blob = new Blob([srt], { type: 'text/plain;charset=utf-8' });
+  const url  = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = ((srtName || 'legenda').replace(/\.(srt|vtt)$/i, '')) + '_sincronizado.srt';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+toggleSrtEditor.addEventListener('click', () => {
+  const open = srtEditorBody.hidden;
+  srtEditorBody.hidden = !open;
+  srtToggleIcon.classList.toggle('open', open);
+  if (open) renderSrtEditor();
+});
+
+srtList.addEventListener('click', (e) => {
+  if (e.target.closest('.srt-inline-editor')) return;
+  const seekBtn = e.target.closest('.srt-seek');
+  if (seekBtn) { seekToSub(+seekBtn.dataset.index); return; }
+  const row = e.target.closest('.srt-item');
+  if (!row) return;
+  const i = +row.dataset.index;
+  if (srtEditorState.editingIndex === i) { closeSrtInlineEditor(); return; }
+  srtEditorState.editingIndex = i;
+  srtEditorState.editingBuffer = {
+    startTime: subtitles[i].startTime,
+    endTime:   subtitles[i].endTime
+  };
+  renderSrtEditor();
+});
+
+srtSearch.addEventListener('input', () => {
+  srtEditorState.filter = srtSearch.value;
+  if (srtEditorState.editingIndex !== -1 &&
+      !getFilteredSubIndices().includes(srtEditorState.editingIndex)) {
+    srtEditorState.editingIndex = -1;
+    srtEditorState.editingBuffer = null;
+  }
+  renderSrtEditor();
+});
+
+srtApplyGlobalBtn.addEventListener('click', applySrtGlobalShift);
+srtGlobalShiftIn.addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.preventDefault(); applySrtGlobalShift(); }
+});
+
+srtFollowBtn.addEventListener('click', followCurrentSub);
+srtUndoBtn.addEventListener('click', undoSrtEdit);
+srtRevertAllBtn.addEventListener('click', revertAllSrtEdits);
+srtExportBtn.addEventListener('click', downloadSrt);
+
+document.addEventListener('keydown', (e) => {
+  const inField = e.target.closest('input, textarea, select');
+  if (inField) return;
+  const mod = e.ctrlKey || e.metaKey;
+  if (mod && e.key.toLowerCase() === 'z' && !srtEditorBody.hidden) {
+    e.preventDefault(); undoSrtEdit();
+  }
+  if (mod && e.key.toLowerCase() === 's') {
+    e.preventDefault(); downloadSrt();
+  }
+});
+
+loadNeuralVoices();
+restoreFiles();
+
+/* exposto p/ testes */
+window.Dubber = {
+  parseSubtitles, gradioAudio, synthLine, getLineBlob, encodeMp3, encodeWav,
+  setSubtitles:(s) => { subtitles = s; lastSubtitleIndex = -1; dubCache.clear(); },
+  getSubtitles:() => subtitles,
+  getLastDub:() => lastDubBlob,
+  playLine: async (t) => playCachedBuffer(lineKey(t)),
+  spaceOrigin
+};
+</script>
+
 </body>
 </html>
